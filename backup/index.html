@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calorimetry Simulation</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Chart.js (external library — cite it in your work cited). Must load BEFORE script.js. -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Order matters: engine (physics) -> content (text) -> script (page logic) -->
+    <script src="engine.js" defer></script>
+    <script src="content.js" defer></script>
+    <script src="script.js" defer></script>
+</head>
+<body>
+
+<!-- ================= TOP BAR ================= -->
+<header class="topbar">
+    <div class="topbar-text">
+        <h1>Calorimetry Simulation</h1>
+        <p>Scenario: An insulated calorimeter contains 0.20 kg of water at 20 °C; metal sample at 100 °C is added.</p>
+    </div>
+    <div class="topbar-buttons">
+        <button id="newInvBtn">New investigation</button>
+        <button id="aboutBtn">About the model</button>
+    </div>
+</header>
+
+<main class="layout">
+
+    <!-- ================= LEFT: controls + variables ================= -->
+    <div class="col col-left">
+
+        <section class="panel" data-card="controls">
+            <h2>Controls</h2>
+            <p id="invSummary" class="summary"></p>
+
+            <div class="card control">
+                <label for="metalPicker">Choose a metal:</label>
+                <select id="metalPicker" class="metals-dropdown">
+                    <button>
+                        <selectedcontent></selectedcontent>
+                    </button>
+                    <option value="">Select a metal</option>
+                    <!-- the five metals are added by script.js from METALS in engine.js -->
+                </select>
+            </div>
+            <small class="note" id="metalNote"></small>
+
+            <div class="card control">
+                <label for="massPicker">Choose a mass: <span id="massValue">0.10</span> kg</label>
+                <input type="range" id="massPicker" min="0.1" max="0.5" step="0.02" value="0.10">
+            </div>
+            <small class="note" id="massNote"></small>
+
+            <div class="button-row">
+                <button id="startBtn" class="primary" disabled>Start</button>
+                <button id="resetRunBtn" disabled>Reset run</button>
+            </div>
+            <p id="startHint" class="start-hint"></p>
+            <p id="statusMsg" class="status" role="alert" aria-live="polite"></p>
+        </section>
+
+        <section class="panel" data-card="runinfo">
+            <h2>Variables</h2>
+            <div class="card">
+                <div class="var-grid">
+                    <div>
+                        <h3>Input</h3>
+                        <p class="var-name" id="inName">Varied input</p>
+                        <p class="var-value" id="inValue">—</p>
+                    </div>
+                    <div>
+                        <h3>Output</h3>
+                        <p class="var-name">Final equilibrium temperature (°C)</p>
+                        <p class="var-value" id="outTf">—</p>
+                    </div>
+                </div>
+
+                <details class="constants">
+                    <summary>Constants <span class="hint">Expand to show</span></summary>
+                    <dl>
+                        <dt id="constHeldName">Held-constant input</dt> <dd id="constHeld">—</dd>
+                        <dt>Water mass</dt>                  <dd id="constWaterMass">—</dd>
+                        <dt>Specific heat of water</dt>      <dd id="constWaterC">—</dd>
+                        <dt>Initial water temperature</dt>   <dd id="constTw">—</dd>
+                        <dt>Initial metal temperature</dt>   <dd id="constTm">—</dd>
+                    </dl>
+                </details>
+            </div>
+        </section>
+    </div>
+
+    <!-- ================= MIDDLE: system, graphs, data ================= -->
+    <div class="col col-mid">
+
+        <div class="mid-top">
+            <section class="panel" data-card="stage">
+                <h2>System</h2>
+                <!-- Placeholder PNGs in /assets — keep the same file names. Positions/sizes are in style.css (section 7). -->
+                <div class="stage" id="stage">
+                    <img class="calorimeter" src="assets/calorimeter.png" alt="Insulated calorimeter containing water">
+                    <img class="metal" id="metalImg" src="assets/metal-iron.png" alt="Metal sample" hidden>
+                    <img class="lid" src="assets/lid.png" alt="Calorimeter lid">
+                    <span class="stage-label label-cal">Calorimeter</span>
+                    <span class="stage-label label-metal">Metal</span>
+                </div>
+            </section>
+
+            <section class="panel" data-card="graph">
+                <h2>Process graph</h2>
+                <div class="card graph-pair">
+                    <figure>
+                        <div class="chart-box"><canvas id="tempChart"></canvas></div>
+                        <figcaption>Temperature over time</figcaption>
+                    </figure>
+                </div>
+            </section>
+        </div>
+
+        <div class="mid-bottom">
+            <section class="panel" data-card="log">
+                <h2>Trial data table</h2>
+                <div class="card">
+                    <table class="log-table">
+                        <thead>
+                            <tr>
+                                <th>Trial</th>
+                                <th>Metal</th>
+                                <th>Mass (kg)</th>
+                                <th>Final equilibrium temperature (°C)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logBody"></tbody>
+                    </table>
+                </div>
+                <p id="runCounter" class="run-counter"></p>
+            </section>
+
+            <section class="panel" data-card="trend">
+                <h2>Trend across trials</h2>
+                <div class="card trend-card">
+                    <p id="trendMsg" class="trend-msg"></p>
+                    <div class="chart-box" id="trendBox" hidden><canvas id="trendChart"></canvas></div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- ================= RIGHT: walkthrough + explanation ================= -->
+    <aside class="col col-right">
+        <section class="panel guide" id="guide">
+            <h2>Walkthrough</h2>
+            <p class="guide-progress" id="guideProgress"></p>
+            <h3 id="guideTitle" class="guide-title"></h3>
+            <div id="guideBody" class="guide-body"></div>
+            <button id="nextBtn" class="primary">Next</button>
+            <!-- appears after the first trial; lets the user switch the guide + explanations off/on between trials -->
+            <label class="guide-toggle" id="guideToggleRow" hidden>
+                <input type="checkbox" id="guideToggle" checked>
+                Show step-by-step guide
+            </label>
+        </section>
+
+        <section class="panel" data-card="inference">
+            <h2>Explanation</h2>
+            <div id="explainBody" class="explain-body"></div>
+        </section>
+    </aside>
+</main>
+
+<!-- ================= WELCOME DIALOG ================= -->
+<dialog id="welcomeDialog" class="wide-dialog">
+    <div class="dialog-content">
+        <h2>Welcome to the Calorimetry Simulation</h2>
+
+        <h3>What is calorimetry?</h3>
+        <p>
+            Calorimetry is an experimental technique used to measure
+            heat transfer during a chemical or physical process.
+            By measuring the final equilibrium temperature of a system,
+            the specific heat capacity of an unknown substance can be determined.
+        </p>
+
+        <p>
+            Calorimetry relies on thermal equilibrium and the Law of
+            Conservation of Energy. When two objects at different
+            temperatures come into thermal contact, heat flows from
+            the hotter object to the cooler one until they reach the
+            same temperature. In an ideal insulated calorimeter,
+            no energy is exchanged with the surroundings.
+        </p>
+
+        <h3>Simulation overview</h3>
+        <p>
+            In this simulation, a metal initially heated to 100 °C
+            is placed in thermal contact with 0.20 kg of water at
+            20 °C inside an insulated calorimeter.
+        </p>
+
+        <p>
+            You will conduct two separate investigations, each
+            consisting of five trial runs. In each investigation,
+            you will vary either the mass or the type of metal while
+            keeping the other input constant.
+        </p>
+
+        <p>
+            After completing the trials, you will receive a data
+            table, a graph of your results, and a step-by-step
+            explanation of how the metal's specific heat capacity
+            can be inferred from the simulated data.
+        </p>
+
+        <p class="section-note">
+            Note: This simulation makes simplifying assumptions and contains limitations.
+            For more information, click “About the model” at the top of the page.
+        </p>
+    </div>
+
+    <div class="dlg-actions">
+        <button type="button" id="welcomeNext" class="primary">Next →</button>
+    </div>
+</dialog>
+
+<!-- ================= NEW INVESTIGATION DIALOG ================= -->
+<dialog id="invDialog">
+    <form method="dialog" id="invForm">
+        <h2>Choose an investigation</h2>
+        <p>Choose which input you will vary to explore the effect of either metal mass or metal type on the final equilibrium temperature modeled. The other input will remain constant throughout all <span id="dlgTarget">5</span> trials.</p>
+        <p id="dlgWarn" class="status" hidden>Starting a new investigation clears your current trials.</p>
+        <label class="opt">
+            <input type="radio" name="mode" value="mass" required>
+            Vary the <strong>metal mass</strong> (same metal every trial)
+        </label>
+
+        <label class="opt">
+            <input type="radio" name="mode" value="metal">
+            Vary the <strong>metal type</strong> (same mass every trial)
+        </label>
+
+        <!-- only offered after the first investigation has been completed -->
+        <label class="opt" id="guidedRow" hidden>
+            <input type="checkbox" id="guidedCheck" checked>
+            Show the step-by-step guide (uncheck to turn it off)
+        </label>
+
+        <div class="dlg-actions">
+            <button type="submit" value="cancel" id="dlgCancel" formnovalidate>Cancel</button>
+            <button type="submit" value="start" class="primary">Start investigation</button>
+        </div>
+    </form>
+</dialog>
+
+<!-- ================= ABOUT THE MODEL DIALOG ================= -->
+<dialog id="aboutDialog" class="wide-dialog">
+    <div class="dialog-content" id="aboutBody"></div>
+    <form method="dialog" class="dlg-actions">
+        <button type="submit" class="primary">Close</button>
+    </form>
+</dialog>
+
+</body>
+</html>

@@ -1,0 +1,344 @@
+/* ============================================================
+   style.css — appearance only
+   Sections: 1 tokens · 2 base · 3 top bar + layout · 4 panels/cards
+             5 controls · 6 dropdown (custom select) · 7 stage + animation
+             8 variables / graphs / table · 9 walkthrough column · 10 dialogs
+   ============================================================ */
+
+/* ---------- 1. TOKENS (change colours here) ---------- */
+:root {
+    --bg-side: #e8edf4;        /* left + right columns */
+    --bg-mid: #bdccdb;         /* middle column */
+    --card: #f4f8fc;           /* white-ish cards */
+    --panel-border: #c9d3de;
+    --text: #222;
+    --muted: #5d6670;
+    --heading: #3d4650;
+    --accent: #4aa3df;
+    --accent-dark: #2b6a9e;
+    --radius: 12px;
+
+    /* animation lengths — script.js overwrites these with its own constants */
+    --metal-ms: 1400ms;
+    --lid-ms: 800ms;
+}
+
+/* ---------- 2. BASE ---------- */
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    height: 100vh;
+    height: 100dvh;                 /* the page never scrolls: the columns scroll instead */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    font-family: 'Roboto', sans-serif;
+    background: var(--bg-side);
+    color: var(--text);
+    line-height: 1.4;
+    font-size: 14px;
+}
+
+[hidden] { display: none !important; }
+
+h1, h2, h3 { margin: 0 0 6px; }
+h1 { font-size: 1.15rem; }
+h2 { font-size: 1.05rem; color: var(--heading); }
+h3 { font-size: 0.9rem; color: var(--heading); }
+p  { margin: 0 0 6px; }
+
+/* ---------- 3. TOP BAR + LAYOUT ---------- */
+.topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 20px;
+    background: #fff;
+    border-bottom: 1px solid var(--panel-border);
+    flex-shrink: 0;
+}
+.topbar p { margin: 0; font-size: 0.9rem; }
+.topbar-buttons { display: flex; gap: 10px; flex-shrink: 0; }
+
+.layout {
+    display: grid;
+    grid-template-columns: 250px minmax(0, 1fr) 300px;   /* controls | simulation | walkthrough */
+    grid-template-rows: minmax(0, 1fr);
+    align-items: stretch;
+    flex: 1;
+    min-height: 0;                  /* fills what is left under the top bar */
+}
+/* Each column scrolls on its own (thin, faint scrollbar).
+   To hide the scrollbars completely, use the two lines marked "hide fully". */
+.col {
+    padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: thin;                              /* faint scrollbar... */
+    scrollbar-color: rgba(0, 0, 0, 0.18) transparent;
+    /* scrollbar-width: none;  <- hide fully: swap with the two lines above */
+}
+/* .col::-webkit-scrollbar { display: none; }   <- hide fully (older Safari): uncomment */
+.col > * { flex-shrink: 0; }
+.col > .panel:last-child { margin-bottom: 14px; }   /* breathing room at the very bottom */
+.col-left, .col-right { background: var(--bg-side); }
+.col-mid { background: var(--bg-mid); gap: 14px; }
+
+.mid-top    { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 14px; }
+.mid-bottom { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+
+/* ---------- 4. PANELS + CARDS ---------- */
+/* A panel = heading + content. The walkthrough highlights the panel it is talking about. */
+.panel {
+    border: 2px solid transparent;
+    border-radius: var(--radius);
+    padding: 6px 8px;
+    margin: -6px -8px;
+    transition: border-color 0.3s;
+}
+.panel.highlight { border-color: var(--accent-dark); }
+
+.card {
+    background: var(--card);
+    border-radius: 10px;
+    padding: 10px 12px;
+}
+
+/* ---------- 5. CONTROLS ---------- */
+.summary { color: var(--muted); font-size: 0.8rem; margin-bottom: 8px; }
+
+.control { display: flex; flex-direction: column; gap: 6px; }
+.control label { font-weight: 500; }
+.note { display: block; color: var(--muted); font-style: italic; font-size: 0.8rem; margin: 4px 0 10px; min-height: 1.2em; }
+input[type="range"] { width: 100%; }
+
+.button-row { display: flex; flex-wrap: wrap; gap: 8px; }
+button {
+    font-family: inherit;
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border: 1.5px solid var(--accent-dark);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--accent-dark);
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
+button:hover:not(:disabled) { background: #eaf4fb; }
+button.primary { background: var(--accent-dark); color: #fff; }
+button.primary:hover:not(:disabled) { background: #1f567f; }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.start-hint { font-style: italic; font-size: 0.8rem; color: var(--muted); margin: 8px 0 0; }
+.start-hint:empty, .status:empty { display: none; }   /* no leftover gap when there is no message */
+.status { color: #b03a2e; min-height: 1.1em; margin: 6px 0 0; font-size: 0.85rem; }
+
+/* ---------- 6. DROPDOWN (customizable select; Chromium only) ---------- */
+select,
+select::picker(select) {
+    appearance: base-select;
+}
+
+.metals-dropdown {
+    width: 100%;
+    border-radius: 5px;
+    border: 1px solid #c8d0d9;
+    background: #fff;
+    padding: 8px 10px;
+    transition: 0.4s;
+    font-family: inherit;
+    color: var(--accent-dark);
+}
+.metals-dropdown:hover:not(:disabled),
+.metals-dropdown:focus { background: #eef3f8; }
+.metals-dropdown:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.metals-dropdown::picker-icon { color: #999999; transition: 0.4s rotate; }
+
+::picker(select) { border: none; border-radius: 5px; }
+
+.metals-dropdown option {
+    display: flex;
+    justify-content: flex-start;
+    gap: 20px;
+    border: 2px solid rgb(230, 228, 228);
+    background: #f3f3f3;
+    padding: 10px;
+    transition: 0.4s;
+}
+.metals-dropdown option:first-of-type { border-radius: 5px 5px 0 0; }
+.metals-dropdown option:last-of-type  { border-radius: 0 0 5px 5px; }
+.metals-dropdown option:not(:last-of-type) { border-bottom: none; }
+.metals-dropdown option:hover,
+.metals-dropdown option:focus { background: #e7e7e7; }
+.metals-dropdown option:checked { font-weight: bold; }
+.metals-dropdown option::checkmark { order: 1; margin-left: auto; }
+
+/* ---------- 7. STAGE (calorimeter picture) + ANIMATION ----------
+   Fixed 300 x 285 box; every image is positioned inside it.
+   If you change the drawings, adjust the left/top/width/height values and the
+   keyframe offsets together:
+     metal lifts straight up (dy), moves left over the calorimeter (dx),
+     then lowers into the water (final dy). */
+.stage {
+    position: relative;
+    width: 300px;
+    height: 285px;
+    max-width: 100%;
+}
+.stage img { position: absolute; display: block; }
+
+.stage .calorimeter { left: 8px; top: 115px; width: 175px; height: 140px; z-index: 1; }
+
+/* lid: sits lifted off the container, slides down when .lid-closed is set */
+.stage .lid {
+    left: 2px; top: 103px; width: 187px; height: 24px; z-index: 3;
+    transform: translateY(-85px);
+    transition: transform var(--lid-ms) ease-in-out;
+}
+.stage.lid-closed .lid { transform: translateY(0); }
+
+/* metal: rests to the right of the calorimeter until .metal-in moves it into the water */
+.stage .metal { 
+    left: 215px; top: 195px; width: 56px; height: 56px; z-index: 2; 
+    transform-origin: 50% 100%;
+    transform: scale(var(--metal-scale, 1));
+}
+.stage.metal-in  .metal { animation: metalIn var(--metal-ms) ease-in-out forwards; }
+.stage.metal-out .metal { animation: metalIn var(--metal-ms) ease-in-out reverse forwards; }
+
+@keyframes metalIn {
+    0%   { transform: translate(0, 0) scale(var(--metal-scale, 1)); ; }
+    35%  { transform: translate(0, -142px) scale(var(--metal-scale, 1)); }        /* lift straight up */
+    65%  { transform: translate(-148px, -142px) scale(var(--metal-scale, 1)); }   /* move over the container */
+    100% { transform: translate(-148px, -20px) scale(var(--metal-scale, 1)); }     /* lower into the water */
+}
+
+.stage-label { position: absolute; top: 262px; font-size: 0.85rem; font-weight: 500; color: var(--heading); }
+.stage-label.label-cal   { left: 62px; }
+.stage-label.label-metal { left: 226px; }
+
+/* ---------- 8. VARIABLES / GRAPHS / TABLE ---------- */
+.var-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.var-name { font-size: 0.8rem; color: var(--muted); margin: 0; }
+.var-value { font-weight: 500; font-size: 0.95rem; margin: 2px 0 0; word-break: break-word; }
+#outTf { color: var(--accent-dark); }
+
+details.constants { margin-top: 10px; }
+details.constants summary { font-weight: 700; color: var(--heading); cursor: pointer; }
+details.constants .hint { display: block; font-weight: 400; font-style: italic; font-size: 0.8rem; color: var(--muted); }
+details.constants[open] .hint { display: none; }
+dl { margin: 6px 0 0; }
+dt { font-size: 0.75rem; color: var(--muted); margin-top: 5px; }
+dd { margin: 0; font-weight: 500; font-size: 0.85rem; }
+
+.graph-pair { display: block; }
+.graph-pair figure { margin: 0; }
+.graph-pair figcaption { text-align: center; font-weight: 700; font-size: 0.8rem; color: var(--heading); margin-top: 6px; }
+.chart-box { position: relative; width: 100%; height: 235px; background: #fff; border-radius: 6px; padding: 4px; }
+
+.log-table { width: 100%; border-collapse: collapse; background: #fff; font-size: 0.8rem; }
+.log-table th, .log-table td { padding: 5px 6px; border: 1px solid var(--panel-border); text-align: right; height: 32px; }
+.log-table th { background: #eef2f6; text-align: center; font-weight: 700; }
+.log-table td:first-child { text-align: center; }
+.log-table td:nth-child(2) { text-align: left; }
+.run-counter { margin: 8px 0 0; font-weight: 700; color: var(--heading); }
+
+.trend-card { min-height: 235px; }
+.trend-card .chart-box { height: 235px; padding: 4px; }
+.trend-msg { font-style: italic; color: var(--muted); margin: 0; }
+
+.placeholder { color: #8a6d00; background: #fff8dc; padding: 1px 4px; border-radius: 3px; }   /* makes dummy text easy to spot */
+
+/* ---------- 9. WALKTHROUGH COLUMN (right) ---------- */
+.guide { display: flex; flex-direction: column; }
+.guide-progress { font-size: 0.85rem; color: var(--muted); }
+.guide-title { font-size: 1rem; color: var(--text); }
+.guide-body { font-size: 0.9rem; }
+.guide-body ul { padding-left: 18px; margin: 6px 0; }
+.guide button { align-self: flex-end; margin-top: 10px; }
+
+/* gentle pulsing ring that points the user at the button they should click next */
+button.nudge { animation: nudgePulse 1.6s ease-out infinite; }
+@keyframes nudgePulse {
+    0%   { box-shadow: 0 0 0 0 rgba(43, 106, 158, 0.55); }
+    70%  { box-shadow: 0 0 0 10px rgba(43, 106, 158, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(43, 106, 158, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+    button.nudge { animation: none; box-shadow: 0 0 0 3px rgba(43, 106, 158, 0.45); }
+}
+
+.guide .guide-toggle { align-self: flex-start; margin-top: 12px; font-size: 0.85rem; color: var(--muted); cursor: pointer; }
+
+/* Explanation text sits in a card like the other panels; the card grows with the text. */
+.explain-body {
+    font-size: 0.9rem;
+    background: var(--card);
+    border-radius: 10px;
+    padding: 10px 12px 20px;
+}
+.explain-body > :last-child { margin-bottom: 0; }
+.explain-body p { margin-bottom: 8px; }
+
+/* ---------- 10. DIALOGS ---------- */
+dialog {
+    border: none;
+    border-radius: 10px;
+    padding: 20px 24px;
+    max-width: 440px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+}
+dialog::backdrop { background: rgba(0, 0, 0, 0.4); }
+/* no focus outline on the dialog box itself when it opens (buttons keep theirs) */
+dialog:focus, dialog:focus-visible,
+.dialog-content:focus, .dialog-content:focus-visible { outline: none; }
+.opt { display: block; margin: 10px 0; cursor: pointer; }
+.dlg-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+
+/* welcome + about dialogs share one wide style */
+.wide-dialog {
+    width: min(720px, calc(100% - 32px));
+    max-width: 720px;
+    max-height: 85vh;
+    padding: 24px 28px;
+    overflow: hidden;
+}
+.wide-dialog .dialog-content {
+    max-height: calc(85vh - 100px);
+    overflow-y: auto;
+    padding-right: 10px;
+}
+.wide-dialog h2 { font-size: 1.4rem; margin-bottom: 16px; }
+.wide-dialog h3 { font-size: 1rem; color: var(--accent-dark); margin-top: 18px; margin-bottom: 8px; }
+.wide-dialog p, .wide-dialog li { line-height: 1.65; margin-bottom: 8px; }
+.wide-dialog .dlg-actions {
+    position: sticky;
+    bottom: 0;
+    background: white;
+    padding-top: 12px;
+    margin-top: 12px;
+}
+.section-note { font-style: italic; font-size: 0.9rem; color: #666; margin-top: 16px; }
+
+/* ---------- 11. NARROW SCREENS ---------- */
+@media (max-width: 1100px) {
+    /* small screens: columns stack and the page scrolls normally */
+    body { height: auto; display: block; overflow: auto; }
+    .layout { grid-template-columns: 1fr; grid-template-rows: auto; }
+    .col { overflow: visible; }
+    .mid-top, .mid-bottom { grid-template-columns: 1fr; }
+    .topbar { flex-direction: column; align-items: flex-start; }
+}
+
+/* equations written in content.js (class "eq" = centred line, "frac" = stacked fraction) */
+.eq { text-align: center; margin: 8px 0 12px; font-family: 'Cambria Math', 'Times New Roman', serif; font-size: 1.05rem; line-height: 1.6; overflow-x: auto; }
+.eq sub { font-size: 0.7em; }
+.frac { display: inline-flex; flex-direction: column; vertical-align: middle; text-align: center; font-size: 0.9em; }
+.frac > span:first-child { border-bottom: 1px solid currentColor; padding: 0 4px 2px; }
+.frac > span:last-child  { padding: 2px 4px 0; }
+.eq-flex { display: flex; align-items: center; justify-content: center; gap: 4px; }   /* label stays beside the fraction */
+.nw { white-space: nowrap; }
