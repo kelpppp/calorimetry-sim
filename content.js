@@ -154,29 +154,98 @@ const ABOUT_MODEL = {
     body: () => `
         <h2>About the model</h2>
 
-        <h3>System and energy transfers</h3>
-        <p>The system is the metal sample and the water inside the calorimeter. Heat flows from the hotter metal to the cooler water until both reach the same temperature. The calorimeter container is not part of the system, and no work is done.</p>
+        <p>This simulation models a calorimetry experiment to investigate how the mass and specific heat capacity of a heated metal influence heat transfer, temperature change, and the final thermal equilibrium temperature when the metal is placed in contact with cooler water in an insulated system.</p>
 
-        <h3>Governing equations</h3>
+        <h3>Calorimetry</h3>
+        <p>Calorimetry is an experimental technique used to measure heat transfer during a chemical or physical process. By measuring the final equilibrium temperature of a system, the specific heat capacity of an unknown substance can be determined.</p>
+        <p>Calorimetry relies on thermal equilibrium and the Law of Conservation of Energy. When two objects at different temperatures come into thermal contact, heat flows from the hotter object to the cooler one until they reach the same temperature. In an ideal insulated calorimeter, no energy is exchanged with the surroundings, so the heat released by one substance is absorbed by the other.</p>
+
+        <h3>Specific heat capacity</h3>
+        <p>Specific heat capacity is the amount of thermal energy required to raise the temperature of a unit mass of a substance by one degree Celsius. It is measured in SI units of J/(kg·°C).</p>
         <ul>
-            <li><strong>Q = mcΔT</strong> — heat transferred to or from a substance with no phase change.</li>
-            <li><strong>Q<sub>lost</sub> + Q<sub>gained</sub> = 0</strong> — conservation of energy in an isolated system.</li>
+            <li>For materials with a high specific heat capacity, more thermal energy is required to cause a temperature change, meaning they heat up and cool down more slowly.</li>
+            <li>For materials with a low specific heat capacity, less thermal energy is required to cause a temperature change, meaning they heat up and cool down more quickly.</li>
         </ul>
-        <p>${PH('Show how these combine to give the final temperature T_f and the inferred specific heat.')}</p>
+        <p>Water has a high specific heat capacity of 4186 J/(kg·°C). In contrast, many metals heat up and cool down quickly because less energy is required to change their temperature. For example, gold has a specific heat capacity of 129 J/(kg·°C).</p>
 
-        <h3>Assumptions</h3>
+        <h3>Simulation overview</h3>
+        <p>In this simulation, a metal initially heated to 100 °C is placed in thermal contact with 0.20 kg of water at 20 °C inside an insulated calorimeter. You will conduct two separate investigations, each consisting of five trials.</p>
         <ul>
-            <li>No phase change occurs: the water stays between 0 °C and 100 °C.</li>
-            <li>No work is done, and the system is fully isolated (no heat exchanged with the surroundings).</li>
-            <li>The calorimeter container absorbs a negligible amount of heat.</li>
+            <li>In each investigation, you will vary either the mass or the type of metal while keeping the other input constant. You will explore how these changes affect the final equilibrium temperature and heat transfer.</li>
+            <li>After completing the trials, you will receive a data table and a graph of your results, with explanations connecting the simulated data to the underlying physics.</li>
+            <li>For each trial, the simulation predicts the final equilibrium temperature of the metal and water based on your inputs. A step-by-step walkthrough demonstrates how to use this temperature to calculate the metal's specific heat capacity.</li>
         </ul>
 
-        <h3>Limitations</h3>
+        <h3>System</h3>
+        <p>The system consists of the metal sample and the water inside the calorimeter. Heat flows from the hotter metal to the cooler water until both substances reach the same final equilibrium temperature. The calorimeter container is excluded from the system, and no work is done by or on the system during heat transfer. The system is assumed to be fully isolated, so its total internal energy remains constant and no heat is exchanged with the surroundings.</p>
+
+        
+        <h3>Governing equations and concepts</h3>
+
+        <p>The model uses the following equations to calculate heat transfer and predict the final equilibrium temperature.</p>
+
+        
+        <h3>Governing equations and concepts</h3>
+
+        <p>The model uses the following equations to calculate heat transfer and predict the final equilibrium temperature.</p>
+
         <ul>
-            <li>Because the container's heat absorption is ignored, the model predicts a final temperature higher than a real calorimeter would measure.</li>
-            <li>The time axis is simulated: the heat-flow rate constant is a model choice, so it changes how fast the curves settle but never the final temperature.</li>
-            <li>${PH('Add any other limitations and their effect on results.')}</li>
-        </ul>`
+            <li>
+                <strong>Q = mcΔT:</strong> Relates the amount of thermal energy transferred to or from a substance when its temperature changes without a phase change.
+                <ul>
+                    <li><strong>Q:</strong> Thermal energy transferred (J)</li>
+                    <li><strong>m:</strong> Mass of the substance (kg)</li>
+                    <li><strong>c:</strong> Specific heat capacity of the material (J/(kg·°C)); the energy required to raise the temperature of 1 kg of the substance by 1 °C</li>
+                    <li><strong>ΔT:</strong> Change in temperature (°C), calculated as the final temperature minus the initial temperature</li>
+                </ul>
+            </li>
+            <li>
+                <strong>Q<sub>gained</sub> + Q<sub>lost</sub> = 0</strong>, or <strong>Q<sub>gained</sub> = −Q<sub>lost</sub>:</strong> Expresses the Law of Conservation of Energy for an isolated system in which no work is done.
+                <ul>
+                    <li><strong>Q<sub>lost</sub>:</strong> Thermal energy released by the hotter substance. Its temperature decreases, so Q is negative.</li>
+                    <li><strong>Q<sub>gained</sub>:</strong> Thermal energy absorbed by the cooler substance. Its temperature increases, so Q is positive.</li>
+                </ul>
+            </li>
+        </ul>
+
+        <p>When two substances at different temperatures come into thermal contact in an insulated system, heat flows from the hotter substance to the cooler one until they reach the same final equilibrium temperature. The heat released by the hotter substance equals the heat absorbed by the cooler substance.</p>
+
+        <p><strong>Equation used to predict the final equilibrium temperature:</strong> By combining the two equations above and rearranging for the final temperature, the model obtains:</p>
+
+        <p style="text-align: center;">
+            T<sub>f</sub> =
+            (m<sub>m</sub>c<sub>m</sub>T<sub>m,i</sub> + m<sub>w</sub>c<sub>w</sub>T<sub>w,i</sub>)
+            / (m<sub>m</sub>c<sub>m</sub> + m<sub>w</sub>c<sub>w</sub>)
+        </p>
+
+        <p>Here, the subscripts m and w represent the metal and water, respectively; i denotes the initial temperature, and T<sub>f</sub> is the final equilibrium temperature.</p>
+
+        <p><strong>Equation used to infer the metal's specific heat capacity:</strong> Once the final equilibrium temperature is known, the metal's specific heat capacity can be calculated by rearranging the conservation of energy equation:</p>
+
+        <p style="text-align: center;">
+            c<sub>m</sub> =
+            m<sub>w</sub>c<sub>w</sub>(T<sub>f</sub> − T<sub>w,i</sub>)
+            / [m<sub>m</sub>(T<sub>m,i</sub> − T<sub>f</sub>)]
+        </p>
+
+        <p>This calculation uses the heat gained by the water to determine the heat lost by the metal, allowing the metal's specific heat capacity to be inferred from the simulated data.</p>
+
+        <h3>Assumptions and limitations</h3>
+
+        <ol>
+            <li>
+                <strong>No phase change:</strong> During a phase change, heat transfer can occur without a temperature change because thermal energy is used to overcome intermolecular forces rather than increase temperature. If ice replaced liquid water in the calorimeter, the calculation would need to account for the energy required to melt the ice. This scenario is not explored in the simulation, which assumes that the initial and final temperatures of the water remain between 0 °C and 100 °C.
+            </li>
+            <li>
+                <strong>No work is done, and the system is fully isolated:</strong> According to the Law of Conservation of Energy, the total internal energy of an isolated system remains constant. The First Law of Thermodynamics states that a system's internal energy can change through heat transfer and work. This simulation assumes that no mechanical work is done on or by the system and that no heat is exchanged with the external environment. Accordingly, all heat released by the hotter substance is assumed to be absorbed by the cooler substance as they reach thermal equilibrium.
+            </li>
+            <li>
+                <strong>The calorimeter container:</strong> In a real calorimeter, heat is transferred between the metal, water, and calorimeter container, which also has mass and is in thermal contact with the substances. The simulation assumes that heat transfer to the container is negligible. As a result, the model may predict a higher final equilibrium temperature than a real calorimeter would measure.
+            </li>
+            <li>
+                <strong>Simulated time axis:</strong> The time axis on the temperature-time graph is simulated. The heat-flow rate constant used to model heat transfer over time is a model choice rather than a value based on actual measurements of thermal conductivity. This allows the temperature-change graph to be displayed within a reasonable amount of time.
+            </li>
+        </ol>`
 };
 
 // ---- small helpers for writing equations as HTML (no math library needed) ----
