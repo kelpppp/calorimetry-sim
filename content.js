@@ -206,20 +206,17 @@ const ABOUT_MODEL = {
                     <li><strong>Q<sub>gained</sub>:</strong> Thermal energy absorbed by the cooler substance. Its temperature increases, so Q is positive.</li>
                 </ul>
             </li>
+            <li>
+                <strong>T<sub>f</sub> =
+                    (m<sub>m</sub>c<sub>m</sub>T<sub>m,i</sub> + m<sub>w</sub>c<sub>w</sub>T<sub>w,i</sub>)
+                    / (m<sub>m</sub>c<sub>m</sub> + m<sub>w</sub>c<sub>w</sub>):
+                </strong> Equation used by the model to predict the final equilibrium temperature, obtained by combining the equations above and rearranging for the final temperature.
+                <ul>
+                    <li>Here, the subscripts m and w represent the metal and water, respectively; i denotes the initial temperature, and T<sub>f</sub> is the final equilibrium temperature.</li>
+                </ul>
+            </li>
         </ul>
-
-        <p>When two substances at different temperatures come into thermal contact in an insulated system, heat flows from the hotter substance to the cooler one until they reach the same final equilibrium temperature. The heat released by the hotter substance equals the heat absorbed by the cooler substance.</p>
-
-        <p><strong>Equation used to predict the final equilibrium temperature:</strong> By combining the two equations above and rearranging for the final temperature, the model obtains:</p>
-
-        <p style="text-align: center;">
-            T<sub>f</sub> =
-            (m<sub>m</sub>c<sub>m</sub>T<sub>m,i</sub> + m<sub>w</sub>c<sub>w</sub>T<sub>w,i</sub>)
-            / (m<sub>m</sub>c<sub>m</sub> + m<sub>w</sub>c<sub>w</sub>)
-        </p>
-
-        <p>Here, the subscripts m and w represent the metal and water, respectively; i denotes the initial temperature, and T<sub>f</sub> is the final equilibrium temperature.</p>
-
+        
         <h3>Assumptions and limitations</h3>
 
         <ol>
