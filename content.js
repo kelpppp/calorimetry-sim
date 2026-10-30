@@ -184,11 +184,6 @@ const ABOUT_MODEL = {
 
         <p>The model uses the following equations to calculate heat transfer and predict the final equilibrium temperature.</p>
 
-        
-        <h3>Governing equations and concepts</h3>
-
-        <p>The model uses the following equations to calculate heat transfer and predict the final equilibrium temperature.</p>
-
         <ul>
             <li>
                 <strong>Q = mcΔT:</strong> Relates the amount of thermal energy transferred to or from a substance when its temperature changes without a phase change.
