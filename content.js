@@ -220,16 +220,6 @@ const ABOUT_MODEL = {
 
         <p>Here, the subscripts m and w represent the metal and water, respectively; i denotes the initial temperature, and T<sub>f</sub> is the final equilibrium temperature.</p>
 
-        <p><strong>Equation used to infer the metal's specific heat capacity:</strong> Once the final equilibrium temperature is known, the metal's specific heat capacity can be calculated by rearranging the conservation of energy equation:</p>
-
-        <p style="text-align: center;">
-            c<sub>m</sub> =
-            m<sub>w</sub>c<sub>w</sub>(T<sub>f</sub> − T<sub>w,i</sub>)
-            / [m<sub>m</sub>(T<sub>m,i</sub> − T<sub>f</sub>)]
-        </p>
-
-        <p>This calculation uses the heat gained by the water to determine the heat lost by the metal, allowing the metal's specific heat capacity to be inferred from the simulated data.</p>
-
         <h3>Assumptions and limitations</h3>
 
         <ol>
