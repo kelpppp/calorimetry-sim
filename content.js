@@ -27,6 +27,9 @@
 
 const PH = (text) => `<span class="placeholder">[PLACEHOLDER] ${text}</span>`;
 
+// Bold section heading inside the Explanation card: ${H('My heading')}
+const H = (title) => `<h4 class="ex-h">${title}</h4>`;
+
 const GUIDE_STEPS = [
     {
         id: 'inputs',
@@ -42,22 +45,25 @@ const GUIDE_STEPS = [
                    <li>Choose a metal from the dropdown menu. This will be changed with each trial.</li>
                </ul>`,
         explanation: (ctx) => ctx.mode === 'mass'
-            ? `<p>For this investigation, you’ve chosen to explore how changing the metal mass affects the final equilibrium temperature reached by the metal-water system in the insulated calorimeter. So, choose a metal once (for all ${ctx.targetRuns} trials) and choose a different mass for every trial.</p>`
-            : `<p>For this investigation, you’ve chosen to explore how changing the type of metal affects the final equilibrium temperature reached by the metal-water system in the insulated calorimeter. So, choose a mass once (for all ${ctx.targetRuns} trials) and choose a different metal for every trial.</p>`,
+            ? `${H('Choosing your inputs')}<p>For this investigation, you’ve chosen to explore how changing the metal mass affects the final equilibrium temperature reached by the metal-water system in the insulated calorimeter. So, choose a metal once (for all ${ctx.targetRuns} trials) and choose a different mass for every trial.</p>`
+            : `${H('Choosing your inputs')}<p>For this investigation, you’ve chosen to explore how changing the type of metal affects the final equilibrium temperature reached by the metal-water system in the insulated calorimeter. So, choose a mass once (for all ${ctx.targetRuns} trials) and choose a different metal for every trial.</p>`,
         nextLabel: () => 'Next'
     },
     {
         id: 'place',
         title: 'Step 2: The system',
-        focus: ['stage', 'runinfo'],      // a list highlights several panels at once
+        focus: ['controls', 'stage', 'runinfo'],      // a list highlights several panels at once
         body: () => `
             <ul>
                 <li>The metal has been placed into the calorimeter, and the lid has been closed.</li>
                 <li>Your chosen input and the constants for this trial are now listed under <strong>Variables</strong>.</li>
+                <li><i>Optional:</i> enter your prediction of the final equilibrium temperature under <strong>Controls</strong> (use “Show hint” if you want help calculating it).</li>
                 <li>Read the physics explanation below. Click “START” to begin the process. </li>
             </ul>`,
         explanation: () => `
+            ${H('An isolated system')}
             <p>The calorimeter in this simulation is an isolated system, in which the total internal energy remains constant. In other words, no energy nor matter is exchanged between the metal-water system and the surroundings.</p>
+            ${H('The calorimeter container')}
             <p>The metal-water system excludes the calorimeter container. Any heat transferred to the material of the calorimeter container is considered negligible.</p>
             <p><i>Note: See “About the model” for more information on the assumptions and limitations of this simulation.</i></p>`,
         nextLabel: () => 'Next'
@@ -75,7 +81,9 @@ const GUIDE_STEPS = [
                 : `<li>The heat transfer process has begun.</li>`}
             </ul>`,
         explanation: () => `
+            ${H('Heat flow and thermal equilibrium')}
             <p>When two objects at different temperatures are placed in thermal contact with each other, heat flows spontaneously from the hotter object to the cooler object until thermal equilibrium is reached (i.e. objects are at the same temperature). In this calorimetry setup, the hotter metal (initially at 100°C) decreases in temperature as heat is transferred from it; the cooler water (initially at 20°C) increases in temperature as heat is transferred to it. After a period of time, the two substances reach the same equilibrium temperature.</p>
+            ${H('Reading the temperature-time graph')}
             <p>This process is shown in the temperature-time graph. The metal’s curve decreases over time while the water’s curve increases over time, with both curves levelling off at the same final temperature. </p>
             <p><i>Note: The temperature-time graph is drawn using simulated seconds on the x-axis and does not reflect the time taken for heat transfer in real life. See “About the model” for more information. </i></p>`,
         nextLabel: () => 'Next'     // Next stays disabled until the 5-second run has finished
@@ -83,18 +91,26 @@ const GUIDE_STEPS = [
     {
         id: 'result',
         title: 'Step 4: The result',
-        focus: 'runinfo',
+        focus: ['stage', 'runinfo'],
         body: () => `
             <ul>
-                <li>The final equilibrium temperature is now shown under <b>Output</b>.</li>
+                <li>The final equilibrium temperature is now shown next to the calorimeter and under <b>Output</b>.</li>
                 <li>The data for this trial is recorded in the data table.</li>
                 <li>Read the physics explanation below. Click "NEXT" to move on.</li>
             </ul>`,
         explanation: (ctx) => {
             const r = ctx.lastRun;          // values from the trial that just finished
             return `
+            ${r.predicted == null ? '' : `${H('Comparing with your prediction')}
+            <p>You predicted <strong>${r.predicted.toFixed(1)} °C</strong>; the simulation gave <strong>${r.Tf.toFixed(2)} °C</strong>. The percentage error is
+            <strong>${r.pctErr.toFixed(1)} %</strong>, calculated as</p>
+            ${eq(`${frac(`|predicted − actual|`, `actual`)} × 100%`)}
+            <p>${r.pctErr <= 5 ? 'That is a close prediction.' : 'A larger gap is a cue to recheck the calculation, for example which initial temperature each substance starts from.'}</p>`}
+            ${H('Same final temperature, same heat transfer')}
             <p>As predicted by the model and shown by the temperature-time graph, both substances reached the same final temperature of <strong>${ctx.lastRun.Tf.toFixed(2)} °C</strong>. As we know from applying the Law of Conservation to an ideal calorimeter (an isolated system), both substances experienced the same magnitude of heat transfer, <strong>${ctx.lastRun.Q.toFixed(1)} J</strong>.</p>
+            ${H('Different temperature changes')}
             <p>However, the final equilibrium temperature is much closer to the initial temperature of the water than the initial temperature of the metal. By calculation, the metal underwent a temperature change of <strong>${Math.abs(r.dTm).toFixed(2)} °C</strong>, while the water experienced a temperature change of only <strong>${r.dTw.toFixed(2)} °C</strong>. This result is also evident in the temperature-time graph: the asymmetry of the curves shows that the water underwent a smaller temperature change than the metal.</p>
+            ${H('Why the temperature changes differ')}
             <p>What explains these observations? When no phase change is involved, as in this simulation, the temperature change caused by an amount of heat transferred Q is related to the mass m and specific heat capacity c of the substance through the equation <strong>Q = mcΔT</strong>. The specific heat capacity of a substance is the amount of energy required to raise the temperature of 1.00 kg of its mass by 1.00 °C. Therefore, in this calorimetry setup, the water experienced a smaller temperature change than the metal for the same magnitude of heat transfer because of its significantly higher specific heat capacity of ${SPEC_HEAT_WATER} J/(kg·°C).</p>`;
         },
         nextLabel: (ctx) => ctx.skipInfer ? 'Next' : 'Next'
@@ -123,7 +139,7 @@ const GUIDE_STEPS = [
                     ? 'The trend graph compares the final equilibrium temperatures for different mass inputs across each trial.'
                     : 'The trend graph compares the final equilibrium temperature for different metal types across each trial.'}</li>
                 <li>${ctx.complete
-                    ? `You have finished all ${ctx.targetRuns} trials. Click <strong>NEW INVESTIGATION</strong> to vary the other input.`
+                    ? `You have finished all ${ctx.targetRuns} trials. Click <strong>VIEW INVESTIGATION SUMMARY</strong> to review your results, or <strong>NEW INVESTIGATION</strong> to vary the other input.`
                     : `Click <strong>NEXT TRIAL</strong> to set up trial ${ctx.runNumber + 1}.`}</li>
             </ul>`,
         explanation: () => '',          // no explanation for this step (the Explanation card hides itself)
@@ -178,6 +194,11 @@ const ABOUT_MODEL = {
 
         <h3>System</h3>
         <p>The system consists of the metal sample and the water inside the calorimeter. Heat flows from the hotter metal to the cooler water until both substances reach the same final equilibrium temperature. The calorimeter container is excluded from the system, and no work is done by or on the system during heat transfer. The system is assumed to be fully isolated, so its total internal energy remains constant and no heat is exchanged with the surroundings.</p>
+
+        
+        <h3>Governing equations and concepts</h3>
+
+        <p>The model uses the following equations to calculate heat transfer and predict the final equilibrium temperature.</p>
 
         
         <h3>Governing equations and concepts</h3>
@@ -241,18 +262,23 @@ const frac = (top, bottom) =>                                           // stack
 function buildInferenceHTML(run) {
     const matchKey = closestMetal(run.cInferred);
     return `
+        ${H('Using calorimetry to find specific heat')}
         <p>Through calorimetry, the heat transferred during a process can be calculated from the measured temperature change of a substance using <i>Q</i> = <i>mc</i>Δ<i>T</i>, and then used to infer the substance’s specific heat capacity.</p>
 
+        ${H('Conservation of energy')}
         <p>Since the calorimeter is assumed to be an isolated system, its internal energy remains constant. The net heat transfer is therefore zero: all heat released by the metal is absorbed by the water. Mathematically:</p>
         ${eq(`<i>Q</i><sub>metal</sub> + <i>Q</i><sub>water</sub> = 0`)}
         ${eq(`<i>Q</i><sub>water</sub> = −<i>Q</i><sub>metal</sub>`)}
 
+        ${H('Heat transfer for each substance')}
         <p>As previously mentioned, the heat transferred for each substance is <i>Q</i> = <i>mc</i>Δ<i>T</i>. Therefore,</p>
         ${eq(`<i>m</i><sub>metal</sub><i>c</i><sub>metal</sub>Δ<i>T</i><sub>metal</sub> + <i>m</i><sub>water</sub><i>c</i><sub>water</sub>Δ<i>T</i><sub>water</sub> = 0`)}
 
+        ${H('Temperature change')}
         <p>The temperature change Δ<i>T</i> of a substance is the difference between the final equilibrium temperature and its initial temperature:</p>
         ${eq(`Δ<i>T</i> = <i>T</i><sub>f</sub> − <i>T</i><sub>i</sub>`)}
 
+        ${H('Solving for the metal’s specific heat capacity')}
         <p>Isolating for the specific heat capacity of the metal:</p>
         ${eq(`<i>c</i><sub>metal</sub> = − ${frac(
             `<i>m</i><sub>water</sub><i>c</i><sub>water</sub>Δ<i>T</i><sub>water</sub>`,
@@ -266,4 +292,97 @@ function buildInferenceHTML(run) {
 
         <p><strong>Closest metal:</strong> ${METALS[matchKey].name}
            (${METALS[matchKey].specificHeat} J/(kg·°C))</p>`;
+}
+
+// ============================================================
+// Prediction hint (the "Show hint" link under the prediction box)
+// ============================================================
+function buildPredictionHint(metal, mass) {
+    return `
+        <p>No heat is lost, so the heat gained by the water equals the heat lost by the metal. Solving for the final temperature gives a weighted average:</p>
+        ${eq(`<i>T</i><sub>f</sub> = ${frac(
+            `<i>m</i><sub>m</sub><i>c</i><sub>m</sub><i>T</i><sub>m,i</sub> + <i>m</i><sub>w</sub><i>c</i><sub>w</sub><i>T</i><sub>w,i</sub>`,
+            `<i>m</i><sub>m</sub><i>c</i><sub>m</sub> + <i>m</i><sub>w</sub><i>c</i><sub>w</sub>`)}`)}
+        <p>Values to substitute (subscripts: m = metal, w = water, i = initial):</p>
+        <ul>
+            <li><i>m</i><sub>m</sub> = ${mass.toFixed(2)} kg; <i>c</i><sub>m</sub> = ${metal.specificHeat} J/(kg·°C) (${metal.name}, from a reference table)</li>
+            <li><i>T</i><sub>m,i</sub> = ${INIT_TEMP_METAL} °C</li>
+            <li><i>m</i><sub>w</sub> = ${MASS_WATER.toFixed(2)} kg; <i>c</i><sub>w</sub> = ${SPEC_HEAT_WATER} J/(kg·°C); <i>T</i><sub>w,i</sub> = ${INIT_TEMP_WATER} °C</li>
+        </ul>`;
+}
+
+// ============================================================
+// Investigation summary (dialog, expandable to a full page)
+// runs: the 5 finished runs. Each has run, metalName, mass, c, Tf, dTm, dTw, Q, cInferred, t/metalT/waterT histories.
+// The canvases created here (sumTrend, sumProc1..5) are drawn by script.js.
+// ============================================================
+function buildSummaryHTML(runs, mode) {
+    const f = (x, d = 2) => x.toFixed(d);
+    const isMass = mode === 'mass';
+    const key = isMass ? 'mass' : 'c';
+    const sorted = [...runs].sort((a, b) => a[key] - b[key]);
+    const first = sorted[0], last = sorted[sorted.length - 1];
+    const mwcw = MASS_WATER * SPEC_HEAT_WATER;
+    const maxMc = Math.max(...runs.map((r) => r.mass * r.c));
+    const range = (arr, d) => `${f(Math.min(...arr), d)} to ${f(Math.max(...arr), d)}`;
+    const slope = (a, b) => (b.Tf - a.Tf) / (b[key] - a[key]);
+    const sA = slope(sorted[0], sorted[1]);
+    const sB = slope(sorted[sorted.length - 2], last);
+    const cErr = Math.max(...runs.map((r) => Math.abs(r.cInferred - r.c) / r.c * 100));
+    const unit = 'J/(kg·°C)';
+
+    const overview = isMass
+        ? `<p>In this investigation you varied the <strong>mass of the metal</strong> (${f(first.mass)} kg to ${f(last.mass)} kg) using the same metal, <strong>${first.metalName}</strong>, every time. The water (${f(MASS_WATER)} kg at ${INIT_TEMP_WATER} °C) and the metal’s starting temperature (${INIT_TEMP_METAL} °C) never changed. The question: <em>how does the amount of metal affect the final equilibrium temperature and the heat transferred?</em></p>`
+        : `<p>In this investigation you varied the <strong>type of metal</strong> (and so its specific heat capacity) using the same mass, <strong>${f(first.mass)} kg</strong>, every time. The water (${f(MASS_WATER)} kg at ${INIT_TEMP_WATER} °C) and the metal’s starting temperature (${INIT_TEMP_METAL} °C) never changed. The question: <em>how does the specific heat capacity of the metal affect the final equilibrium temperature and the heat transferred?</em></p>`;
+
+    const equations = `
+        <p>For each substance, with no phase change, the heat transferred is</p>
+        ${eq(`<i>Q</i> = <i>mc</i>Δ<i>T</i>`)}
+        <p>The calorimeter is an isolated system with no work done, so energy is conserved and the heat released by the metal is the heat absorbed by the water:</p>
+        ${eq(`<i>Q</i><sub>metal</sub> + <i>Q</i><sub>water</sub> = 0`)}
+        <p>Combining these gives the model’s prediction for the final equilibrium temperature, and rearranging gives the specific heat of the metal that was inferred from each trial:</p>
+        ${eq(`<i>T</i><sub>f</sub> = ${frac(`<i>m</i><sub>m</sub><i>c</i><sub>m</sub><i>T</i><sub>m,i</sub> + <i>m</i><sub>w</sub><i>c</i><sub>w</sub><i>T</i><sub>w,i</sub>`, `<i>m</i><sub>m</sub><i>c</i><sub>m</sub> + <i>m</i><sub>w</sub><i>c</i><sub>w</sub>`)}`)}
+        ${eq(`${nw(`<i>c</i><sub>m</sub> = −`)}${frac(`<i>m</i><sub>w</sub><i>c</i><sub>w</sub>Δ<i>T</i><sub>w</sub>`, `<i>m</i><sub>m</sub>Δ<i>T</i><sub>m</sub>`)}`, 'eq-flex')}`;
+
+    const rows = runs.map((r) => `<tr><td>${r.run}</td><td>${r.metalName}</td><td>${f(r.mass)}</td><td>${r.c}</td>
+        <td>${f(r.Tf)}</td><td>${f(Math.abs(r.dTm))}</td><td>${f(r.dTw)}</td><td>${f(r.Q, 0)}</td><td>${f(r.cInferred, 1)}</td></tr>`).join('');
+    const table = `<div class="sum-table-wrap"><table class="sum-table"><thead><tr>
+        <th>Trial</th><th>Metal</th><th>Mass (kg)</th><th><i>c</i><sub>m</sub> used (${unit})</th><th><i>T</i><sub>f</sub> (°C)</th>
+        <th>|Δ<i>T</i><sub>metal</sub>| (°C)</th><th>Δ<i>T</i><sub>water</sub> (°C)</th><th><i>Q</i> (J)</th><th>Inferred <i>c</i><sub>m</sub> (${unit})</th>
+        </tr></thead><tbody>${rows}</tbody></table></div>
+        <p class="section-note">The specific heat of the metal was hidden while you ran the trials. It is shown here, next to the value you could infer from the measured final temperature.</p>`;
+
+    let trendText;
+    if (isMass) {
+        trendText = `
+        <p>As the mass of ${first.metalName.toLowerCase()} increased from ${f(first.mass)} kg to ${f(last.mass)} kg, the final equilibrium temperature rose from <strong>${f(first.Tf)} °C</strong> to <strong>${f(last.Tf)} °C</strong>, and the heat transferred rose from ${f(first.Q, 0)} J to ${f(last.Q, 0)} J. A larger mass of hot metal has a larger heat capacity (<i>mc</i>), so it can release more heat before it cools to the water’s temperature, and the final temperature moves closer to the metal’s starting ${INIT_TEMP_METAL} °C.</p>
+        <p>The relationship is <strong>not linear</strong>. The equilibrium temperature is a weighted average of ${INIT_TEMP_METAL} °C and ${INIT_TEMP_WATER} °C, weighted by the heat capacities of the metal (<i>mc</i>) and of the water (<i>m</i><sub>w</sub><i>c</i><sub>w</sub> = ${f(mwcw, 1)} J/°C). In your data the curve rose by ${f(sA, 1)} °C per kg between the two smallest masses but only ${f(sB, 1)} °C per kg between the two largest: each extra kilogram of metal adds less, and <i>T</i><sub>f</sub> would approach ${INIT_TEMP_METAL} °C only for an enormous mass.</p>`;
+    } else {
+        const list = sorted.map((r) => `<li>${r.metalName} (<i>c</i> = ${r.c} ${unit}): <i>T</i><sub>f</sub> = ${f(r.Tf)} °C, <i>Q</i> = ${f(r.Q, 0)} J</li>`).join('');
+        trendText = `
+        <p>With the mass fixed at ${f(first.mass)} kg, metals with a larger specific heat capacity produced a higher final temperature:</p>
+        <ul>${list}</ul>
+        <p>A metal with a high <i>c</i> stores more thermal energy per degree, so for the same mass it releases more heat as it cools and warms the water more. A low-<i>c</i> metal changes temperature a lot while giving up little heat, so the final temperature stays close to the water’s starting ${INIT_TEMP_WATER} °C. Between the two lowest specific heats <i>T</i><sub>f</sub> changed by ${f(sA * 100, 1)} °C per 100 ${unit}, but between the two highest by only ${f(sB * 100, 1)} °C per 100 ${unit}: the gains level off as the metal’s heat capacity (<i>mc</i>) becomes comparable to the water’s.</p>`;
+    }
+
+    const analysis = `
+        <p><strong>Same heat, different temperature changes.</strong> In every trial the metal and the water exchanged exactly the same amount of heat (${range(runs.map((r) => r.Q), 0)} J across the trials), as the Law of Conservation of Energy requires. Yet the water’s temperature changed by only ${range(runs.map((r) => r.dTw), 1)} °C while the metal’s changed by ${range(runs.map((r) => Math.abs(r.dTm)), 1)} °C. Since Δ<i>T</i> = <i>Q</i>/(<i>mc</i>), the substance with the larger <i>mc</i> changes temperature less. Here the water’s <i>m</i><sub>w</sub><i>c</i><sub>w</sub> = ${f(mwcw, 1)} J/°C ${maxMc < mwcw ? `was larger than the metal’s <i>mc</i> in every trial (at most ${f(maxMc, 1)} J/°C)` : 'compared with the metal’s <i>mc</i> of up to ' + f(maxMc, 1) + ' J/°C'}. A bigger temperature change does not mean more heat was transferred.</p>
+        <p><strong>Inferring specific heat.</strong> ${isMass
+            ? `Using the measured final temperature, the inferred specific heat was about ${f(runs[0].cInferred, 1)} ${unit} in every trial, matching the tabulated ${first.c} ${unit} for ${first.metalName.toLowerCase()}. It did not depend on the mass: specific heat is a property of the material, not of how much of it there is.`
+            : `For each metal, the specific heat inferred from the measured final temperature agreed with the value used by the model to within ${f(cErr, 2)} %. The ordering of the metals by inferred specific heat matches the ordering of their final temperatures, so a measured final temperature really can identify an unknown metal.`}</p>
+        <p><strong>Limitations.</strong> The model assumes the calorimeter container absorbs no heat and that no heat is lost to the surroundings, so the inferred values agree almost perfectly. In a real calorimeter the container would absorb some heat, the measured final temperature would be lower than predicted, and the specific heat inferred with this simple equation would tend to be too low. See “About the model” for all assumptions.</p>`;
+
+    const procs = runs.map((r) => `<figure style="margin:0"><div class="sum-chart"><canvas id="sumProc${r.run}"></canvas></div></figure>`).join('');
+
+    return `
+        <h3>Investigation overview</h3>${overview}
+        <h3>Governing equations</h3>${equations}
+        <h3>Trial data</h3>${table}
+        <h3>Trend across trials</h3>
+        <div class="sum-chart"><canvas id="sumTrend"></canvas></div>
+        ${trendText}
+        <h3>Process graphs of each trial</h3>
+        <p>Temperature over time for the metal and the water in each trial. Both curves level off at the same final temperature.</p>
+        <div class="proc-grid">${procs}</div>
+        <h3>Analysis and interpretation</h3>${analysis}`;
 }

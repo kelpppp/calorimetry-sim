@@ -28,15 +28,20 @@
         <p>Scenario: An insulated calorimeter contains 0.20 kg of water at 20 °C; metal sample at 100 °C is added.</p>
     </div>
     <div class="topbar-buttons">
+        <button id="resetAllBtn">Reset all</button>
         <button id="newInvBtn">New investigation</button>
         <button id="aboutBtn">About the model</button>
     </div>
 </header>
 
-<main class="layout">
+<main class="layout" data-closed="0">
+
+    <!-- tabs that hide / show the two floating side panels -->
+    <button class="edge-tab edge-tab-left" id="controlsToggle" aria-expanded="true" aria-controls="leftCol" title="Hide controls" aria-label="Hide controls">‹</button>
+    <button class="edge-tab edge-tab-right" id="guideToggleTab" aria-expanded="true" aria-controls="rightCol" title="Hide walkthrough" aria-label="Hide walkthrough">›</button>
 
     <!-- ================= LEFT: controls + variables ================= -->
-    <div class="col col-left">
+    <div class="col col-left" id="leftCol">
 
         <section class="panel" data-card="controls">
             <h2>Controls</h2>
@@ -60,6 +65,18 @@
             </div>
             <small class="note" id="massNote"></small>
 
+            <!-- optional prediction: only editable in step 2 (guided) -->
+            <div class="card control" id="predCard">
+                <label for="predInput">Predicted final temperature:</label>
+                <div class="pred-box">
+                    <input type="number" id="predInput" min="20" max="50" step="0.1" placeholder="____" inputmode="decimal" disabled>
+                    <span class="pred-unit">°C</span>
+                </div>
+            </div>
+            <small class="note" id="predNote">Optional</small>
+            <button type="button" id="hintBtn" class="link-btn" hidden>Show hint</button>
+            <div id="hintBox" class="hint-box" hidden></div>
+
             <div class="button-row">
                 <button id="startBtn" class="primary" disabled>Start</button>
                 <button id="resetRunBtn" disabled>Reset run</button>
@@ -81,6 +98,17 @@
                         <h3>Output</h3>
                         <p class="var-name">Final equilibrium temperature (°C)</p>
                         <p class="var-value" id="outTf">—</p>
+                    </div>
+                </div>
+
+                <div class="var-grid pred-grid">
+                    <div>
+                        <p class="var-name">Your prediction (°C)</p>
+                        <p class="var-value" id="predValue">—</p>
+                    </div>
+                    <div>
+                        <p class="var-name">Percentage error</p>
+                        <p class="var-value" id="predErr">—</p>
                     </div>
                 </div>
 
@@ -110,7 +138,11 @@
                     <img class="metal" id="metalImg" src="assets/metal-iron.png" alt="Metal sample" hidden>
                     <img class="lid" src="assets/lid.png" alt="Calorimeter lid">
                     <span class="stage-label label-cal">Calorimeter</span>
-                    <span class="stage-label label-metal">Metal</span>
+                    <!-- appears next to the calorimeter when the 5-second run has finished -->
+                    <div class="temp-readout" id="tempReadout" hidden>
+                        <span class="temp-readout-label">Final equilibrium temperature</span>
+                        <span class="temp-readout-value" id="tempReadoutValue">—</span>
+                    </div>
                 </div>
             </section>
 
@@ -135,7 +167,12 @@
                                 <th>Trial</th>
                                 <th>Metal</th>
                                 <th>Mass (kg)</th>
-                                <th>Final equilibrium temperature (°C)</th>
+                                <th>Final T<sub>f</sub> (°C)</th>
+                                <th class="col-more1">Heat transferred (J)</th>
+                                <th class="col-more2">Predicted T<sub>f</sub> (°C)</th>
+                                <th class="col-more2">Error (%)</th>
+                                <th class="col-more2">ΔT metal (°C)</th>
+                                <th class="col-more2">ΔT water (°C)</th>
                             </tr>
                         </thead>
                         <tbody id="logBody"></tbody>
@@ -155,13 +192,16 @@
     </div>
 
     <!-- ================= RIGHT: walkthrough + explanation ================= -->
-    <aside class="col col-right">
+    <aside class="col col-right" id="rightCol">
         <section class="panel guide" id="guide">
             <h2>Walkthrough</h2>
             <p class="guide-progress" id="guideProgress"></p>
             <h3 id="guideTitle" class="guide-title"></h3>
             <div id="guideBody" class="guide-body"></div>
-            <button id="nextBtn" class="primary">Next</button>
+            <div class="guide-actions">
+                <button id="summaryBtn" hidden>View investigation summary</button>
+                <button id="nextBtn" class="primary">Next</button>
+            </div>
             <!-- appears after the first trial; lets the user switch the guide + explanations off/on between trials -->
             <label class="guide-toggle" id="guideToggleRow" hidden>
                 <input type="checkbox" id="guideToggle" checked>
@@ -170,8 +210,12 @@
         </section>
 
         <section class="panel" data-card="inference">
-            <h2>Explanation</h2>
-            <div id="explainBody" class="explain-body"></div>
+            <div class="panel-head">
+                <h2>Explanation</h2>
+                <button id="expandBtn" class="mini" title="Open the explanation in a larger window">⤢ Expand</button>
+            </div>
+            <div id="explainBody" class="explain-body" tabindex="0" role="button" aria-haspopup="dialog"
+                 title="Click to expand"></div>
         </section>
     </aside>
 </main>
@@ -257,6 +301,40 @@
             <button type="submit" value="start" class="primary">Start investigation</button>
         </div>
     </form>
+</dialog>
+
+<!-- ================= EXPLANATION (expanded) DIALOG ================= -->
+<dialog id="explainDialog" class="wide-dialog">
+    <div class="dialog-content">
+        <h2>Explanation</h2>
+        <p class="dlg-sub" id="explainDlgTitle"></p>
+        <div class="explain-dlg-body" id="explainDlgBody"></div>
+    </div>
+    <form method="dialog" class="dlg-actions">
+        <button type="submit" class="primary">Close</button>
+    </form>
+</dialog>
+
+<!-- ================= INVESTIGATION SUMMARY DIALOG (expandable to a full page) ================= -->
+<dialog id="summaryDialog" class="wide-dialog summary-dlg">
+    <div class="summary-head">
+        <h2>Investigation summary</h2>
+        <button type="button" id="summaryExpand" class="mini">⤢ Expand</button>
+    </div>
+    <div class="dialog-content" id="summaryBody"></div>
+    <form method="dialog" class="dlg-actions">
+        <button type="submit" class="primary">Close</button>
+    </form>
+</dialog>
+
+<!-- ================= RESET ALL (confirmation) DIALOG ================= -->
+<dialog id="resetDialog">
+    <h2>Reset everything?</h2>
+    <p>This clears all trials, graphs and predictions and takes you back to choosing an investigation.</p>
+    <div class="dlg-actions">
+        <button type="button" id="resetCancel">Cancel</button>
+        <button type="button" id="resetConfirm" class="primary">Yes, reset all</button>
+    </div>
 </dialog>
 
 <!-- ================= ABOUT THE MODEL DIALOG ================= -->

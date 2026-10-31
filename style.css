@@ -18,8 +18,7 @@
     --accent-dark: #2b6a9e;
     --radius: 12px;
 
-    /* animation lengths — script.js overwrites these with its own constants */
-    --metal-ms: 1400ms;
+    /* animation length — script.js overwrites this with its own constant */
     --lid-ms: 800ms;
 }
 
@@ -63,13 +62,18 @@ p  { margin: 0 0 6px; }
 .topbar-buttons { display: flex; gap: 10px; flex-shrink: 0; }
 
 .layout {
-    display: grid;
-    grid-template-columns: 290px minmax(0, 1fr) 300px;   /* controls | simulation | walkthrough */
-    grid-template-rows: minmax(0, 1fr);
-    align-items: stretch;
+    position: relative;
     flex: 1;
     min-height: 0;                  /* fills what is left under the top bar */
+    --left-w: 290px;                /* width of the floating Controls panel */
+    --right-w: 300px;               /* width of the floating Walkthrough panel */
+    --lp: calc(var(--left-w) + 28px);    /* space the middle box leaves for each side panel */
+    --rp: calc(var(--right-w) + 28px);
 }
+/* closed side panels: the middle box grows into the space (only a small tab is left) */
+.layout.controls-closed { --lp: 36px; }
+.layout.guide-closed    { --rp: 36px; }
+
 /* Each column scrolls on its own (thin, faint scrollbar).
    To hide the scrollbars completely, use the two lines marked "hide fully". */
 .col {
@@ -83,12 +87,49 @@ p  { margin: 0 0 6px; }
 /* .col::-webkit-scrollbar { display: none; }   <- hide fully (older Safari): uncomment */
 .col > * { flex-shrink: 0; }
 .col > .panel:last-child { margin-bottom: 14px; }   /* breathing room at the very bottom */
-.col-left, .col-right { background: var(--bg-side); }
-.col-mid { background: var(--bg-mid); gap: 14px; }
-.col-left { gap: 28px; }          /* more space between Controls and Variables */
+.col-mid {
+    position: absolute; inset: 0;
+    background: var(--bg-mid); gap: 14px;
+    padding-left: var(--lp); padding-right: var(--rp);
+    transition: padding 0.25s ease;
+}
+/* Side panels float above the middle box like cards, with a shadow, and slide away when closed */
+.col-left, .col-right {
+    position: absolute; top: 12px; bottom: 12px; z-index: 5;
+    background: var(--bg-side);
+    border-radius: 14px;
+    box-shadow: 0 6px 22px rgba(20, 40, 70, 0.28), 0 1px 4px rgba(20, 40, 70, 0.18);
+    transition: transform 0.25s ease, visibility 0s linear 0s;
+}
+.col-left  { left: 12px;  width: var(--left-w);  gap: 28px; }   /* gap = space between Controls and Variables */
+.col-right { right: 12px; width: var(--right-w); }
+.layout.controls-closed .col-left  { transform: translateX(calc(-100% - 24px)); visibility: hidden; transition: transform 0.25s ease, visibility 0s linear 0.25s; }
+.layout.guide-closed    .col-right { transform: translateX(calc(100% + 24px));  visibility: hidden; transition: transform 0.25s ease, visibility 0s linear 0.25s; }
+
+/* little tabs on the edge of each side panel: click to hide / show it */
+.edge-tab {
+    position: absolute; top: 50%; transform: translateY(-50%); z-index: 6;
+    width: 14px; height: 44px; padding: 0;
+    font-size: 0.95rem; line-height: 1; text-transform: none;
+    background: rgba(255, 255, 255, 0.55); color: var(--muted);
+    border: 1px solid rgba(0, 0, 0, 0.12); box-shadow: none;
+    opacity: 0.6;
+    transition: left 0.25s ease, right 0.25s ease, opacity 0.2s, background 0.2s;
+}
+.edge-tab:hover:not(:disabled) { opacity: 1; background: #fff; }
+.edge-tab-left  { left: calc(var(--left-w) + 14px);  border-radius: 0 8px 8px 0; border-left: none; }   /* sits in the gap beside the panel */
+.edge-tab-right { right: calc(var(--right-w) + 14px); border-radius: 8px 0 0 8px; border-right: none; }
+.layout.controls-closed .edge-tab-left  { left: 0; }
+.layout.guide-closed    .edge-tab-right { right: 0; }
 
 .mid-top    { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 14px; }
 .mid-bottom { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+.layout[data-closed="2"] .mid-bottom { grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); }   /* more room for the table */
+
+/* data table: essential columns always; more columns appear as the side panels are hidden */
+.col-more1, .col-more2 { display: none; }
+.layout:not([data-closed="0"]) .col-more1,
+.layout[data-closed="2"] .col-more2 { display: table-cell; }
 
 /* ---------- 4. PANELS + CARDS ---------- */
 /* A panel = heading + content. The walkthrough highlights the panel it is talking about. */
@@ -178,12 +219,11 @@ select::picker(select) {
 .metals-dropdown option:checked { font-weight: bold; }
 .metals-dropdown option::checkmark { order: 1; margin-left: auto; }
 
-/* ---------- 7. STAGE (calorimeter picture) + ANIMATION ----------
+/* ---------- 7. STAGE (calorimeter picture) + LID ANIMATION ----------
    Fixed 300 x 285 box; every image is positioned inside it.
-   If you change the drawings, adjust the left/top/width/height values and the
-   keyframe offsets together:
-     metal lifts straight up (dy), moves left over the calorimeter (dx),
-     then lowers into the water (final dy). */
+   If you change the drawings, adjust the left/top/width/height values.
+   The metal is simply shown inside the water as soon as it is chosen (no movement);
+   only the lid slides. */
 .stage {
     position: relative;
     width: 300px;
@@ -202,25 +242,31 @@ select::picker(select) {
 }
 .stage.lid-closed .lid { transform: translateY(0); }
 
-/* metal: rests to the right of the calorimeter until .metal-in moves it into the water */
-.stage .metal { 
-    left: 215px; top: 195px; width: 56px; height: 56px; z-index: 2; 
+/* metal: shown inside the water as soon as a metal is chosen (no movement).
+   --metal-scale (set by script.js from the mass slider) grows it from its bottom-centre.
+   Picking a different metal fades the picture out and in (.swap, see script.js). */
+.stage .metal {
+    left: 67px; top: 175px; width: 56px; height: 56px; z-index: 2;
     transform-origin: 50% 100%;
     transform: scale(var(--metal-scale, 1));
+    transition: opacity 0.22s ease;
 }
-.stage.metal-in  .metal { animation: metalIn var(--metal-ms) ease-in-out forwards; }
-.stage.metal-out .metal { animation: metalIn var(--metal-ms) ease-in-out reverse forwards; }
-
-@keyframes metalIn {
-    0%   { transform: translate(0, 0) scale(var(--metal-scale, 1)); ; }
-    35%  { transform: translate(0, -142px) scale(var(--metal-scale, 1)); }        /* lift straight up */
-    65%  { transform: translate(-148px, -142px) scale(var(--metal-scale, 1)); }   /* move over the container */
-    100% { transform: translate(-148px, -20px) scale(var(--metal-scale, 1)); }     /* lower into the water */
-}
+.stage .metal.swap { opacity: 0; }
 
 .stage-label { position: absolute; top: 262px; font-size: 0.85rem; font-weight: 500; color: var(--heading); }
 .stage-label.label-cal   { left: 62px; }
-.stage-label.label-metal { left: 226px; }
+
+/* final equilibrium temperature, shown beside the calorimeter once the run has finished */
+.temp-readout {
+    position: absolute; left: 198px; top: 188px; width: 98px; z-index: 2;   /* where the "Metal" label was */
+    background: var(--card);
+    border: 1.5px solid var(--accent-dark);
+    border-radius: 10px;
+    padding: 8px 6px;
+    text-align: center;
+}
+.temp-readout-label { display: block; font-size: 0.72rem; line-height: 1.25; color: var(--muted); }
+.temp-readout-value { display: block; margin-top: 4px; font-size: 1.25rem; font-weight: 700; color: var(--accent-dark); }
 
 /* ---------- 8. VARIABLES / GRAPHS / TABLE ---------- */
 .var-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -243,6 +289,8 @@ dd { margin: 0; font-weight: 500; font-size: 0.85rem; }
 
 .log-table { width: 100%; border-collapse: collapse; background: #fff; font-size: 0.8rem; }
 .log-table th, .log-table td { padding: 5px 6px; border: 1px solid var(--panel-border); text-align: right; height: 32px; }
+.log-table th sub { font-size: 0.7em; }
+.log-table th, .log-table td { font-size: 0.76rem; }
 .log-table th { background: #eef2f6; text-align: center; font-weight: 700; }
 .log-table td:first-child { text-align: center; }
 .log-table td:nth-child(2) { text-align: left; }
@@ -261,7 +309,7 @@ dd { margin: 0; font-weight: 500; font-size: 0.85rem; }
 .guide-title { font-size: 1rem; color: var(--text); }
 .guide-body { font-size: 0.9rem; }
 .guide-body ul { padding-left: 18px; margin: 6px 0; }
-.guide button { align-self: flex-end; margin-top: 10px; }
+.guide-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 
 /* gentle pulsing ring that points the user at the button they should click next */
 button.nudge { animation: nudgePulse 1.6s ease-out infinite; }
@@ -276,15 +324,46 @@ button.nudge { animation: nudgePulse 1.6s ease-out infinite; }
 
 .guide .guide-toggle { align-self: flex-start; margin-top: 12px; font-size: 0.85rem; color: var(--muted); cursor: pointer; }
 
-/* Explanation text sits in a card like the other panels; the card grows with the text. */
+/* Right column: the Walkthrough (with the NEXT button) stays put, so NEXT is always in view.
+   Only the Explanation card scrolls, inside itself. Click it (or "Expand") to read it in a larger window. */
+.col-right { overflow-y: auto; }                       /* fallback only, for a really short screen */
+.col-right .panel[data-card="inference"] {
+    flex: 1 1 auto;                                    /* takes all the height left under the Walkthrough */
+    flex-shrink: 1;
+    min-height: 150px;
+    display: flex;
+    flex-direction: column;
+}
+.panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.panel-head h2 { margin-bottom: 6px; }
+button.mini { padding: 2px 10px; font-size: 0.72rem; margin-bottom: 4px; }
+
 .explain-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
     font-size: 0.9rem;
     background: var(--card);
     border-radius: 10px;
     padding: 10px 12px 20px;
+    cursor: zoom-in;
+    scrollbar-width: thin;                              /* faint scrollbar */
+    scrollbar-color: rgba(0, 0, 0, 0.18) transparent;
 }
+.explain-body:hover { box-shadow: 0 0 0 2px rgba(43, 106, 158, 0.25); }
 .explain-body > :last-child { margin-bottom: 0; }
 .explain-body p { margin-bottom: 8px; }
+
+/* bold section headings inside explanations (written in content.js with H('...')) */
+.ex-h { font-size: 0.95rem; font-weight: 700; color: var(--heading); margin: 14px 0 4px; }
+.ex-h:first-child { margin-top: 0; }
+
+/* the expanded explanation dialog */
+.dlg-sub { color: var(--muted); font-size: 0.9rem; margin: -8px 0 12px; }
+.dlg-sub:empty { display: none; }
+.explain-dlg-body { font-size: 1rem; }
+.explain-dlg-body .ex-h { font-size: 1.05rem; margin-top: 18px; }
+.explain-dlg-body .ex-h:first-child { margin-top: 0; }
 
 /* ---------- 10. DIALOGS ---------- */
 dialog {
@@ -330,7 +409,13 @@ dialog:focus, dialog:focus-visible,
 @media (max-width: 1180px) {
     /* small screens: columns stack and the page scrolls normally */
     body { height: auto; display: block; overflow: auto; }
-    .layout { grid-template-columns: 1fr; grid-template-rows: auto; }
+    .layout { display: block; position: static; }
+    .col-mid, .col-left, .col-right {
+        position: static; width: auto; transform: none !important; visibility: visible !important;
+        box-shadow: none; border-radius: 0; padding: 14px 16px;
+    }
+    .edge-tab { display: none; }
+    .col-more1, .col-more2 { display: table-cell !important; }
     .col { overflow: visible; }
     .mid-top, .mid-bottom { grid-template-columns: 1fr; }
     .topbar { flex-direction: column; align-items: flex-start; }
@@ -344,3 +429,45 @@ dialog:focus, dialog:focus-visible,
 .frac > span:last-child  { padding: 2px 4px 0; }
 .eq-flex { display: flex; align-items: center; justify-content: center; gap: 4px; }   /* label stays beside the fraction */
 .nw { white-space: nowrap; }
+
+/* ---------- prediction box (Controls) ---------- */
+.pred-box {
+    display: flex; align-items: center; gap: 6px;
+    background: #fff; border: 1px solid #c8d0d9; border-radius: 8px; padding: 2px 10px;
+}
+.pred-box input {
+    flex: 1; min-width: 0; border: none; outline: none; background: transparent;
+    font: inherit; font-size: 1.05rem; color: var(--accent-dark); padding: 6px 0;
+}
+.pred-box:focus-within { border-color: var(--accent-dark); }
+.pred-box:has(input:disabled) { opacity: 0.55; }
+.pred-unit { color: var(--accent-dark); }
+.link-btn {
+    border: none; background: none; padding: 0; margin: -4px 0 8px; font-size: 0.8rem;
+    text-transform: none; text-decoration: underline; color: var(--accent-dark);
+}
+.link-btn:hover:not(:disabled) { background: none; color: #1f567f; }
+.hint-box { background: var(--card); border-left: 3px solid var(--accent); border-radius: 6px; padding: 6px 10px; margin: 0 0 10px; font-size: 0.82rem; }
+.hint-box .eq { font-size: 0.95rem; margin: 6px 0; }
+.hint-box ul { margin: 4px 0; padding-left: 18px; }
+.pred-grid { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--panel-border); }
+
+/* ---------- investigation summary ---------- */
+#summaryDialog { width: min(900px, calc(100% - 32px)); max-width: 900px; max-height: 90vh; display: none; flex-direction: column; }
+#summaryDialog[open] { display: flex; }
+#summaryDialog .dialog-content { flex: 1; min-height: 0; max-height: none; }
+#summaryDialog.full { width: 100vw; max-width: none; height: 100vh; max-height: none; margin: 0; border-radius: 0; }
+.summary-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.summary-head h2 { margin: 0 0 12px; }
+.summary-head button { margin-bottom: 12px; }
+.sum-table-wrap { overflow-x: auto; margin: 8px 0 14px; }
+.sum-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+.sum-table th, .sum-table td { border: 1px solid var(--panel-border); padding: 4px 6px; text-align: right; }
+.sum-table th { background: #eef2f6; text-align: center; }
+.sum-table td:nth-child(1) { text-align: center; }
+.sum-table td:nth-child(2) { text-align: left; }
+.sum-chart { position: relative; width: 100%; height: 280px; background: #fff; border: 1px solid var(--panel-border); border-radius: 6px; padding: 4px; margin: 8px 0 12px; }
+.proc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; margin: 8px 0 12px; }
+.proc-grid .sum-chart { height: 200px; margin: 0; }
+#summaryDialog.full .sum-chart { height: 340px; }
+#summaryDialog.full .proc-grid .sum-chart { height: 230px; }

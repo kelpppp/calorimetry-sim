@@ -8,7 +8,7 @@
 //
 // How the page works (the short version):
 //   1. "New investigation" asks which input to vary (mass or metal).
-//   2. Each RUN = choose inputs -> metal goes into calorimeter, lid closes ->
+//   2. Each RUN = choose inputs (the metal is shown in the water as soon as it is chosen) -> lid closes ->
 //      START -> the graph draws for 5 s -> result, table row, trend graph update.
 //   3. After TARGET_RUNS runs the investigation is complete.
 //   4. The Walkthrough (Next button) walks through each run. It can be turned
@@ -24,8 +24,8 @@
 // ---------- 1. CONFIG (easy to change) ----------
 const TARGET_RUNS = 5;          // runs per investigation
 const PLAYBACK_SECONDS = 5;     // how long the graph takes to draw (real seconds)
-const METAL_MOVE_MS = 1400;     // metal moving into the calorimeter
 const LID_MS = 800;             // lid closing
+const PRED_MIN = 20, PRED_MAX = 50;   // prediction range (°C): every possible final temperature lies between about 21 and 48
 const MASS_DEFAULT = 0.10;      // kg — slider value after a reset
 const METAL_MAX_SCALE = 1.3;    // metal picture size at the largest mass (1 = size at the smallest mass)
 const TYPE_MIN_CPS = 90;         // Explanation typing speed: characters per second (minimum)
@@ -36,7 +36,14 @@ const COLORS = { metal: '#e67e22', water: '#2e86de', trend: '#2c3e50' };
 // ---------- 2. DOM REFERENCES ----------
 const $ = (id) => document.getElementById(id);
 const dom = {
-    stage: $('stage'), metalImg: $('metalImg'),
+    stage: $('stage'), metalImg: $('metalImg'), 
+    predInput: $('predInput'), predNote: $('predNote'), hintBtn: $('hintBtn'), hintBox: $('hintBox'),
+    predValue: $('predValue'), predErr: $('predErr'),
+    summaryBtn: $('summaryBtn'), summaryDlg: $('summaryDialog'), summaryBody: $('summaryBody'), summaryExpand: $('summaryExpand'),
+    resetAllBtn: $('resetAllBtn'), resetDlg: $('resetDialog'), resetConfirm: $('resetConfirm'), resetCancel: $('resetCancel'),
+    layout: document.querySelector('.layout'), controlsToggle: $('controlsToggle'), guideTab: $('guideToggleTab'),
+    tempReadout: $('tempReadout'), tempReadoutValue: $('tempReadoutValue'),
+    expandBtn: $('expandBtn'), explainDlg: $('explainDialog'), explainDlgBody: $('explainDlgBody'), explainDlgTitle: $('explainDlgTitle'),
     metalPicker: $('metalPicker'), massPicker: $('massPicker'), massValue: $('massValue'),
     metalNote: $('metalNote'), massNote: $('massNote'),
     startBtn: $('startBtn'), startHint: $('startHint'), resetRunBtn: $('resetRunBtn'),
@@ -69,11 +76,11 @@ const app = {
     lastRun: null,
     // phase of the CURRENT run:
     //   'idle'      nothing placed yet; inputs editable
-    //   'placing'   metal moving in / lid closing
+    //   'placing'   lid closing
     //   'placed'    metal in calorimeter, lid closed, waiting for START
     //   'running'   graph is being drawn
     //   'done'      run finished
-    //   'resetting' lid opening / metal coming out
+    //   'resetting' lid opening
     phase: 'idle',
     stepIndex: 0,          // index into GUIDE_STEPS
     token: 0,              // bumped whenever a run is cancelled, so old async code stops itself
@@ -303,6 +310,12 @@ function clearRunPanels() {
         dom[id].textContent = '—';
     }
     dom.constHeldName.textContent = 'Held-constant input';
+    dom.tempReadout.hidden = true;          // the temperature beside the calorimeter appears again after the next run
+    dom.predInput.value = '';
+    dom.predValue.textContent = '—';
+    dom.predErr.textContent = '—';
+    dom.hintBox.hidden = true;
+    dom.hintBtn.textContent = 'Show hint';
     tempChart.data.datasets.forEach((ds) => { ds.data = []; });
     tempChart.options.scales.x.max = 1;
     tempChart.update('none');
@@ -313,28 +326,65 @@ function clearLog() {
     dom.logBody.innerHTML = '';
     for (let i = 1; i <= TARGET_RUNS; i++) {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${i}</td><td></td><td></td><td></td>`;
+        tr.innerHTML = `<td>${i}</td>` + '<td></td>'.repeat(3) + '<td class="col-more1"></td>' + '<td class="col-more2"></td>'.repeat(4);
         dom.logBody.appendChild(tr);
     }
 }
 
 function fillLogRow(r) {
-    const tr = dom.logBody.rows[r.run - 1];
-    tr.cells[1].textContent = r.metalName;
-    tr.cells[2].textContent = r.mass.toFixed(2);
-    tr.cells[3].textContent = r.Tf.toFixed(2);
+    const c = dom.logBody.rows[r.run - 1].cells;
+    c[1].textContent = r.metalName;
+    c[2].textContent = r.mass.toFixed(2);
+    c[3].textContent = r.Tf.toFixed(2);
+    c[4].textContent = r.Q.toFixed(0);                                          // heat transferred (J)
+    c[5].textContent = r.predicted == null ? '—' : r.predicted.toFixed(1);      // prediction
+    c[6].textContent = r.pctErr == null ? '—' : r.pctErr.toFixed(1);            // % error
+    c[7].textContent = r.dTm.toFixed(2);                                        // ΔT metal
+    c[8].textContent = r.dTw.toFixed(2);                                        // ΔT water
+}
+
+// Empties one row again (used when a finished run is reset).
+function clearLogRow(n) {
+    const c = dom.logBody.rows[n - 1].cells;
+    for (let i = 1; i < c.length; i++) c[i].textContent = '';
 }
 
 // Shows the chosen metal next to the calorimeter (only when nothing is in the water).
-function updateMetalPreview() {
+// Changing to a different metal fades the old picture out and the new one in.
+// Returns a promise that resolves when the swap is finished.
+let swapToken = 0;
+async function updateMetalPreview() {
+    const img = dom.metalImg;
     const key = dom.metalPicker.value;
-    if (METALS[key]) {
-        dom.metalImg.src = `assets/metal-${key}.png`;
-        dom.metalImg.alt = `${METALS[key].name} sample`;
-        dom.metalImg.hidden = false;
-    } else {
-        dom.metalImg.hidden = true;
+    const my = ++swapToken;
+    if (!METALS[key]) { img.hidden = true; return; }
+    const src = `assets/metal-${key}.png`;
+    const alt = `${METALS[key].name} sample`;
+    if (!img.hidden && img.getAttribute('src') === src) return;      // already showing it
+    if (img.hidden) {                                                // first appearance: fade in
+        img.src = src; img.alt = alt;
+        img.classList.add('swap'); img.hidden = false;
+        void img.offsetWidth;
+        img.classList.remove('swap');
+        return;
     }
+    img.classList.add('swap');                                       // fade out, swap picture, fade in
+    await sleep(230);
+    if (my !== swapToken) return;
+    img.src = src; img.alt = alt;
+    img.classList.remove('swap');
+    await sleep(230);
+}
+
+// Reads the optional prediction: { ok, value } (value = null when left blank) or { ok: false, msg }.
+function readPrediction() {
+    const raw = dom.predInput.value.trim();
+    if (raw === '') return { ok: true, value: null };
+    const v = parseFloat(raw);
+    if (!(v >= PRED_MIN && v <= PRED_MAX)) {
+        return { ok: false, msg: `Enter a prediction between ${PRED_MIN} and ${PRED_MAX} °C, or leave it blank.` };
+    }
+    return { ok: true, value: v };
 }
 
 
@@ -366,13 +416,32 @@ function updateControls() {
     dom.inName.textContent = app.mode === 'mass' ? 'Metal mass (kg)'
         : app.mode === 'metal' ? 'Metal type' : 'Varied input';
 
+    // prediction box: editable in step 2 only (guided), or between trials (free mode)
+    const predEditable = hasInv && !complete && (app.guided
+        ? currentStepId() === 'place' && app.phase === 'placed'
+        : (app.phase === 'idle' || app.phase === 'done'));
+    dom.predInput.disabled = !predEditable;
+    dom.predNote.textContent = !hasInv ? 'Optional'
+        : predEditable ? (app.guided ? 'Optional. Enter your prediction, then click START.' : 'Optional')
+        : app.guided ? 'Optional. Locked outside step 2 (after you choose your inputs).' : 'Optional';
+    dom.hintBtn.hidden = !predEditable;
+    if (!predEditable) dom.hintBox.hidden = true;
+    if (!dom.hintBox.hidden) {
+        const v = readInputs();
+        if (v.metal) dom.hintBox.innerHTML = buildPredictionHint(v.metal, v.mass);
+    }
+    dom.hintBtn.textContent = dom.hintBox.hidden ? 'Show hint' : 'Hide hint';
+
+    // summary button: after all trials have finished
+    dom.summaryBtn.hidden = !(complete && app.phase === 'done');
+
     // START
     const guidedStartOk = app.guided && currentStepId() === 'place' && app.phase === 'placed';
     const freeStartOk = !app.guided && hasInv && !complete && (app.phase === 'idle' || app.phase === 'done');
     dom.startBtn.disabled = !(guidedStartOk || freeStartOk);
 
     // RESET RUN / NEW INVESTIGATION
-    dom.resetRunBtn.disabled = !hasInv || complete || app.phase === 'placing' || app.phase === 'resetting';
+    dom.resetRunBtn.disabled = !hasInv || (complete && app.phase !== 'done') || app.phase === 'placing' || app.phase === 'resetting';
     dom.newInvBtn.disabled = app.phase === 'placing' || app.phase === 'resetting';
 
     // summary line + counter
@@ -412,6 +481,9 @@ function updateControls() {
         ? 'START isn’t available yet. Follow the Walkthrough and click NEXT to continue.'
         : '';
 
+    // "Trial # of 5" stays in the side panel whether or not the step-by-step guide is on
+    dom.guideProgress.textContent = hasInv ? `Trial ${guideContext().runNumber} of ${TARGET_RUNS}` : '';
+
     renderExplanation();
     updateNudge();
 }
@@ -434,7 +506,7 @@ function renderGuide() {
             if (panel) panel.classList.add('highlight');
         });
     } else {
-        dom.guideProgress.textContent = 'Guide off';
+        dom.guideProgress.textContent = app.mode === null ? '' : `Trial ${ctx.runNumber} of ${TARGET_RUNS}`;
         dom.guideTitle.textContent = REFERENCE.title;
         dom.guideBody.innerHTML = REFERENCE.body(ctx);
         dom.nextBtn.hidden = true;
@@ -520,53 +592,53 @@ function updateNudge() {
     if (nextReady && id === 'inputs') nextReady = validateInputs().ok;   // only once valid inputs are chosen
     dom.nextBtn.classList.toggle('nudge', nextReady);
     dom.startBtn.classList.toggle('nudge', app.guided && !dom.startBtn.disabled && !isTyping);
+    // walkthrough hidden but something to click there: pulse its tab
+    const waiting = app.guided && !dom.nextBtn.disabled;
+    dom.guideTab.classList.toggle('nudge', waiting && dom.layout.classList.contains('guide-closed'));
 }
 
 function goToStep(id) {
+    setWalkthroughOpen(true);                       // a new step always brings the Walkthrough back
+    if (id === 'inputs') setControlsOpen(true);     // the inputs live in the controls panel
     app.stepIndex = GUIDE_STEPS.findIndex((s) => s.id === id);
     renderGuide();
     updateControls();
 }
 
 
-// ---------- 9. ANIMATIONS (metal + lid) ----------
-// Each function returns a promise that resolves when the animation is over.
+// ---------- 9. ANIMATIONS (lid only) ----------
+// The metal is simply shown inside the water as soon as it is chosen (see updateMetalPreview),
+// so only the lid moves. Each function returns a promise that resolves when the animation is over.
 // They return false if the run was cancelled in the meantime.
 
-// Metal moves into the water, THEN the lid closes.
+// The lid closes.
 async function placeMetal(token) {
-    dom.stage.classList.add('metal-in');
-    await sleep(METAL_MOVE_MS);
-    if (token !== app.token) return false;
     dom.stage.classList.add('lid-closed');
     await sleep(LID_MS);
     return token === app.token;
 }
 
-// Lid opens, THEN the metal comes back out. Also clears the run's panels and graphs.
+// The lid opens. Also clears the run's panels and graph.
 async function resetRunVisuals() {
+    dom.tempReadout.hidden = true;
     if (dom.stage.classList.contains('lid-closed')) {
         dom.stage.classList.remove('lid-closed');
         await sleep(LID_MS);
-    }
-    if (dom.stage.classList.contains('metal-in')) {
-        dom.stage.classList.remove('metal-in');
-        dom.stage.classList.add('metal-out');
-        await sleep(METAL_MOVE_MS);
-        dom.stage.classList.remove('metal-out');
     }
     clearRunPanels();
 }
 
 // Instant version (no animation), used when a whole investigation is replaced.
 function resetStageInstant() {
-    dom.stage.classList.remove('lid-closed', 'metal-in', 'metal-out');
+    dom.stage.classList.remove('lid-closed');
 }
 
 
 // ---------- 10. RUNNING AN EXPERIMENT ----------
 async function runExperiment(v, token) {
     fillInputsPanel(v);                    // inputs + constants appear when START is clicked
+    dom.predValue.textContent = v.predicted == null ? 'None' : `${v.predicted.toFixed(1)} °C`;
+    dom.predErr.textContent = '—';
     app.phase = 'running';
     updateControls();
 
@@ -588,14 +660,21 @@ function onRunComplete(v, result) {
         dTm: result.deltaTMetal,
         dTw: result.deltaTWater,
         Q: result.maxHeatTransferred,
-        cInferred: result.inferredSpecificHeat
+        cInferred: result.inferredSpecificHeat,
+        predicted: v.predicted == null ? null : v.predicted,
+        t: result.timeHistory, metalT: result.metalTempHistory, waterT: result.waterTempHistory   // kept for the summary graphs
     };
+    run.pctErr = run.predicted == null ? null : Math.abs(run.predicted - run.Tf) / run.Tf * 100;
     app.runs.push(run);
     app.lastRun = run;
     app.phase = 'done';
     if (isComplete()) app.everCompleted = true;
 
     dom.outTf.textContent = `${run.Tf.toFixed(2)} °C`;   // output appears when the graphs are finished
+    dom.tempReadoutValue.textContent = `${run.Tf.toFixed(2)} °C`;   // ...and next to the calorimeter
+    dom.tempReadout.hidden = false;
+    dom.predErr.textContent = run.pctErr == null ? '—' : `${run.pctErr.toFixed(1)} %`;
+    dom.predInput.value = '';
     fillLogRow(run);
     updateTrendChart();
 
@@ -611,6 +690,9 @@ function onRunComplete(v, result) {
 async function onStart() {
     const v = validateInputs();
     if (!v.ok) { showMsg(v.msg); return; }
+    const pr = readPrediction();
+    if (!pr.ok) { showMsg(pr.msg); return; }
+    v.predicted = pr.value;
     clearMsg();
     const token = app.token;
 
@@ -626,7 +708,8 @@ async function onStart() {
             await resetRunVisuals();
             if (token !== app.token) return;
         }
-        updateMetalPreview();
+        await updateMetalPreview();
+        if (token !== app.token) return;
         app.phase = 'placing';
         updateControls();
         if (!(await placeMetal(token))) return;
@@ -692,6 +775,104 @@ function onGuideToggle() {
     updateControls();
 }
 
+// Show / hide the floating side panels. The middle box grows or shrinks to fit (CSS does the work).
+function setControlsOpen(open) {
+    dom.layout.classList.toggle('controls-closed', !open);
+    dom.controlsToggle.textContent = open ? '‹' : '›';
+    dom.controlsToggle.title = dom.controlsToggle.ariaLabel = open ? 'Hide controls' : 'Show controls';
+    dom.controlsToggle.setAttribute('aria-expanded', String(open));
+    updateClosedCount();
+}
+function updateClosedCount() {      // the data table shows more columns the more panels are hidden
+    dom.layout.dataset.closed = ['controls-closed', 'guide-closed'].filter((c) => dom.layout.classList.contains(c)).length;
+}
+function setWalkthroughOpen(open) {
+    dom.layout.classList.toggle('guide-closed', !open);
+    dom.guideTab.textContent = open ? '›' : '‹';
+    dom.guideTab.title = dom.guideTab.ariaLabel = open ? 'Hide walkthrough' : 'Show walkthrough';
+    dom.guideTab.setAttribute('aria-expanded', String(open));
+    updateClosedCount();
+    updateNudge();
+    updateNudge();
+}
+
+// Expanded (dialog) view of the Explanation card.
+function openExplainDialog() {
+    if (dom.explainPanel.hidden || !lastExplainHTML) return;
+    dom.explainDlgTitle.textContent = app.guided ? dom.guideTitle.textContent : '';
+    dom.explainDlgBody.innerHTML = lastExplainHTML;       // the full text (no typing effect)
+    dom.explainDlg.showModal();
+}
+
+// ---- Investigation summary ----
+let sumCharts = [];
+function openSummary() {
+    if (!isComplete()) return;
+    sumCharts.forEach((c) => c.destroy());
+    sumCharts = [];
+    dom.summaryDlg.classList.remove('full');
+    dom.summaryExpand.textContent = '⤢ Expand';
+    dom.summaryBody.innerHTML = buildSummaryHTML(app.runs, app.mode);
+    dom.summaryBody.scrollTop = 0;
+    dom.summaryDlg.showModal();
+    drawSummaryCharts();
+}
+
+function drawSummaryCharts() {
+    const isMass = app.mode === 'mass';
+    const key = isMass ? 'mass' : 'c';
+    const pts = [...app.runs].sort((a, b) => a[key] - b[key]).map((r) => ({ x: r[key], y: r.Tf, metal: r.metalName, run: r.run }));
+    const common = { animation: false, maintainAspectRatio: false };
+    sumCharts.push(new Chart($('sumTrend'), {
+        type: 'line',
+        data: { datasets: [{ label: 'Final temperature', data: pts, borderColor: COLORS.trend, backgroundColor: COLORS.trend, borderWidth: 2, pointRadius: 5 }] },
+        options: { ...common,
+            scales: {
+                x: { type: 'linear', title: { display: true, text: isMass ? 'Metal mass (kg)' : 'Specific heat of the metal (J/(kg·°C))' } },
+                y: { title: { display: true, text: 'Final equilibrium temperature (°C)' } }
+            },
+            plugins: { legend: { display: false },
+                title: { display: true, text: `Final temperature vs. ${isMass ? 'metal mass' : 'specific heat'}` },
+                tooltip: { callbacks: { label: (i) => `${i.raw.metal}, trial ${i.raw.run}: ${i.parsed.y.toFixed(2)} °C` } } }
+        }
+    }));
+    for (const r of app.runs) {
+        sumCharts.push(new Chart($(`sumProc${r.run}`), {
+            type: 'line',
+            data: { datasets: [
+                { label: 'Metal', data: toPoints(r.t, r.metalT), borderColor: COLORS.metal, backgroundColor: COLORS.metal, borderWidth: 2, pointRadius: 0 },
+                { label: 'Water', data: toPoints(r.t, r.waterT), borderColor: COLORS.water, backgroundColor: COLORS.water, borderWidth: 2, pointRadius: 0 }
+            ] },
+            options: { ...common,
+                scales: {
+                    x: { type: 'linear', min: 0, max: r.t[r.t.length - 1], title: { display: true, text: 'Time (simulated s)' } },
+                    y: { min: 10, max: 105, title: { display: true, text: 'Temperature (°C)' } }
+                },
+                plugins: { legend: { position: 'top', labels: { boxWidth: 10 } },
+                    title: { display: true, text: `Trial ${r.run}: ${r.metalName}, ${r.mass.toFixed(2)} kg` } }
+            }
+        }));
+    }
+}
+
+// RESET ALL: ask first, then wipe everything and go back to the very first choice.
+function resetAll() {
+    app.token++;
+    if (app.animId) cancelAnimationFrame(app.animId);
+    app.animId = null;
+    resetStageInstant();
+    setControlsOpen(true);
+    app.mode = null; app.guided = true; app.everCompleted = false; app.trial1Done = false;
+    app.runs = []; app.lastRun = null; app.phase = 'idle'; app.stepIndex = 0;
+    lastExplainHTML = null;
+    dom.metalPicker.value = '';
+    dom.massPicker.value = MASS_DEFAULT;
+    updateMassLabel(); updateMetalSize(); updateMetalPreview();
+    clearMsg(); clearRunPanels(); clearLog(); updateTrendChart();
+    renderGuide(); updateControls();
+    openDialog();
+}
+
 // RESET RUN: abandon the current run (the data table stays).
 async function onResetRun() {
     app.token++;                           // stops any animation/await in progress
@@ -699,6 +880,15 @@ async function onResetRun() {
     if (app.animId) cancelAnimationFrame(app.animId);
     app.animId = null;
     clearMsg();
+
+    // A run that already finished is taken back out of the data, so the trial is repeated (same trial number).
+    if (app.phase === 'done' && app.runs.length > 0) {
+        const undone = app.runs.pop();
+        clearLogRow(undone.run);
+        app.lastRun = app.runs[app.runs.length - 1] || null;
+        updateTrendChart();
+        if (app.guided) app.stepIndex = GUIDE_STEPS.findIndex((s) => s.id === 'inputs');   // the later steps need this run's data
+    }
 
     app.phase = 'resetting';
     updateControls();
@@ -717,6 +907,7 @@ function startNewInvestigation(mode, guided) {
     if (app.animId) cancelAnimationFrame(app.animId);
     app.animId = null;
     resetStageInstant();
+    setControlsOpen(true);
 
     app.mode = mode;
     app.guided = guided;
@@ -757,10 +948,34 @@ function bindEvents() {
     dom.welcomeDlg.addEventListener('close', () => { openDialog(); }, { once: true });
 
     dom.startBtn.addEventListener('click', onStart);
+    dom.guideTab.addEventListener('click', () => setWalkthroughOpen(dom.layout.classList.contains('guide-closed')));
+    dom.controlsToggle.addEventListener('click', () => setControlsOpen(dom.layout.classList.contains('controls-closed')));
+
+    // Explanation: click the card (without selecting text), press Enter on it, or use the Expand button
+    dom.explainBody.addEventListener('click', () => { if (!String(window.getSelection()).trim()) openExplainDialog(); });
+    dom.explainBody.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openExplainDialog(); } });
+    dom.expandBtn.addEventListener('click', openExplainDialog);
+    dom.explainDlg.addEventListener('click', (e) => {          // a click on the dark backdrop closes it
+        const r = dom.explainDlg.getBoundingClientRect();
+        if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) dom.explainDlg.close();
+    });
     dom.guideToggle.addEventListener('change', onGuideToggle);
     dom.nextBtn.addEventListener('click', onNext);
     dom.resetRunBtn.addEventListener('click', onResetRun);
     dom.newInvBtn.addEventListener('click', openDialog);
+    dom.summaryBtn.addEventListener('click', openSummary);
+    dom.summaryExpand.addEventListener('click', () => {
+        const full = dom.summaryDlg.classList.toggle('full');
+        dom.summaryExpand.textContent = full ? '⤡ Shrink' : '⤢ Expand';
+    });
+    dom.resetAllBtn.addEventListener('click', () => dom.resetDlg.showModal());
+    dom.resetCancel.addEventListener('click', () => dom.resetDlg.close());
+    dom.resetConfirm.addEventListener('click', () => { dom.resetDlg.close(); resetAll(); });
+    dom.hintBtn.addEventListener('click', () => {
+        dom.hintBox.hidden = !dom.hintBox.hidden;
+        updateControls();
+    });
+    dom.predInput.addEventListener('input', clearMsg);
     dom.aboutBtn.addEventListener('click', () => { dom.aboutDlg.showModal(); });
 
     dom.massPicker.addEventListener('input', () => { updateMassLabel(); updateMetalSize(); clearMsg(); updateNudge(); });
@@ -789,7 +1004,6 @@ function bindEvents() {
 // ---------- 12. INIT ----------
 function init() {
     // animation lengths come from the constants above, so there is one place to change them
-    dom.stage.style.setProperty('--metal-ms', `${METAL_MOVE_MS}ms`);
     dom.stage.style.setProperty('--lid-ms', `${LID_MS}ms`);
 
     // build the dropdown from METALS (engine.js)
@@ -800,6 +1014,7 @@ function init() {
         dom.metalPicker.appendChild(option);
     }
 
+    dom.predInput.min = PRED_MIN; dom.predInput.max = PRED_MAX;
     dom.aboutBody.innerHTML = ABOUT_MODEL.body();   // text lives in content.js
 
     createCharts();
